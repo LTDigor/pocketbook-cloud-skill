@@ -1,0 +1,41 @@
+{
+  "name": "pocketbook-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for exploring and integrating with a PocketBook account.",
+  "type": "module",
+  "bin": {
+    "pocketbook-mcp": "./dist/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LTDigor/pocketbook-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/LTDigor/pocketbook-mcp/issues"
+  },
+  "homepage": "https://github.com/LTDigor/pocketbook-mcp#readme",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "keywords": [
+    "mcp",
+    "pocketbook"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "dotenv": "^17.4.2",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "tsx": "^4.22.3",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.6"
+  }
+}
