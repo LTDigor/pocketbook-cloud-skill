@@ -27,14 +27,66 @@ describe("PocketBookClient", () => {
     expect(client.getConfigSummary()).toEqual({
       baseUrl: "https://cloud.pocketbook.digital",
       hasAccessToken: true,
+      hasRefreshToken: false,
       hasWebClientId: true,
       hasCookie: true,
+      hasEnvFilePath: false,
       configuredPaths: {
         profilePath: null,
         booksPath: null,
         devicesPath: null,
       },
     });
+  });
+
+  it("renews access tokens with the configured refresh token", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        access_token: "new-access",
+        refresh_token: "new-refresh",
+        token_type: "Bearer",
+        expires_in: 7200,
+      }),
+    );
+
+    const client = new PocketBookClient({
+      baseUrl: "https://cloud.pocketbook.digital",
+      accessToken: "old-access",
+      refreshToken: "old-refresh",
+      webClientId: "1779259365474",
+    });
+
+    await expect(client.renewToken()).resolves.toMatchObject({
+      status: 200,
+      tokens: {
+        accessToken: "new-access",
+        refreshToken: "new-refresh",
+        tokenType: "Bearer",
+        expiresIn: 7200,
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL("https://cloud.pocketbook.digital/api/v1.0/auth/renew-token"),
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          authorization: "Bearer old-access",
+          "x-web-client": "1779259365474",
+          "content-type": "application/x-www-form-urlencoded",
+        }),
+        body: "grant_type=refresh_token&refresh_token=old-refresh",
+      }),
+    );
+  });
+
+  it("requires a refresh token before renewing access", async () => {
+    const client = new PocketBookClient({
+      baseUrl: "https://cloud.pocketbook.digital",
+    });
+
+    await expect(client.renewToken()).rejects.toThrow("POCKETBOOK_REFRESH_TOKEN is required");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("sends PocketBook auth headers on GET requests", async () => {

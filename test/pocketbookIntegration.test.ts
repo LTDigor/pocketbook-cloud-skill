@@ -2,7 +2,7 @@ import "dotenv/config";
 import { describe, expect, it } from "vitest";
 import { PocketBookClient } from "../src/pocketbookClient.js";
 
-const hasLiveAuth = Boolean(process.env.POCKETBOOK_ACCESS_TOKEN);
+const hasLiveAuth = process.env.POCKETBOOK_RUN_INTEGRATION === "1" && Boolean(process.env.POCKETBOOK_ACCESS_TOKEN);
 const liveIt = hasLiveAuth ? it : it.skip;
 
 describe("PocketBookClient live integration", () => {

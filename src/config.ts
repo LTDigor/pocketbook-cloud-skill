@@ -3,8 +3,10 @@ import { readFile } from "node:fs/promises";
 export type PocketBookConfig = {
   baseUrl: string;
   accessToken?: string;
+  refreshToken?: string;
   webClientId?: string;
   cookieHeader?: string;
+  envFilePath?: string;
   booksPath?: string;
   devicesPath?: string;
   profilePath?: string;
@@ -20,8 +22,10 @@ export async function loadConfig(): Promise<PocketBookConfig> {
   return {
     baseUrl: normalizeBaseUrl(process.env.POCKETBOOK_BASE_URL || DEFAULT_BASE_URL),
     accessToken: emptyToUndefined(process.env.POCKETBOOK_ACCESS_TOKEN),
+    refreshToken: emptyToUndefined(process.env.POCKETBOOK_REFRESH_TOKEN),
     webClientId: emptyToUndefined(process.env.POCKETBOOK_WEB_CLIENT_ID),
     cookieHeader,
+    envFilePath: emptyToUndefined(process.env.POCKETBOOK_ENV_FILE),
     booksPath: emptyToUndefined(process.env.POCKETBOOK_BOOKS_PATH),
     devicesPath: emptyToUndefined(process.env.POCKETBOOK_DEVICES_PATH),
     profilePath: emptyToUndefined(process.env.POCKETBOOK_PROFILE_PATH),

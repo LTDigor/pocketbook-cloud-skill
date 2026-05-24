@@ -7,7 +7,9 @@ import { loadConfig } from "../src/config.js";
 const ENV_KEYS = [
   "POCKETBOOK_BASE_URL",
   "POCKETBOOK_ACCESS_TOKEN",
+  "POCKETBOOK_REFRESH_TOKEN",
   "POCKETBOOK_WEB_CLIENT_ID",
+  "POCKETBOOK_ENV_FILE",
   "POCKETBOOK_COOKIE_HEADER",
   "POCKETBOOK_COOKIE_FILE",
   "POCKETBOOK_BOOKS_PATH",
@@ -37,12 +39,16 @@ describe("loadConfig", () => {
   it("normalizes the base URL and reads token settings", async () => {
     process.env.POCKETBOOK_BASE_URL = "https://example.test///";
     process.env.POCKETBOOK_ACCESS_TOKEN = "token";
+    process.env.POCKETBOOK_REFRESH_TOKEN = "refresh-token";
     process.env.POCKETBOOK_WEB_CLIENT_ID = "client-id";
+    process.env.POCKETBOOK_ENV_FILE = "/tmp/pocketbook.env";
 
     await expect(loadConfig()).resolves.toMatchObject({
       baseUrl: "https://example.test",
       accessToken: "token",
+      refreshToken: "refresh-token",
       webClientId: "client-id",
+      envFilePath: "/tmp/pocketbook.env",
     });
   });
 

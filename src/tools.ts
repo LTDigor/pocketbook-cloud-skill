@@ -1,7 +1,9 @@
 import { z } from "zod/v4";
+import { readFile, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { PocketBookConfig } from "./config.js";
-import { PocketBookClient } from "./pocketbookClient.js";
+import { PocketBookClient, type BatchUploadResult } from "./pocketbookClient.js";
 import {
   normalizeBooksPayload,
   normalizeStatsPayload,
@@ -40,6 +42,36 @@ const DEFAULT_DEVICE_PATHS = [
 
 export function registerPocketBookTools(server: McpServer, config: PocketBookConfig): void {
   const client = new PocketBookClient(config);
+  const refreshAuth = async (): Promise<boolean> => {
+    if (!config.refreshToken) {
+      return false;
+    }
+
+    const response = await client.renewToken();
+    const hasNewAccessToken = Boolean(response.tokens.accessToken);
+    if (!isOk(response.status) || !hasNewAccessToken) {
+      return false;
+    }
+
+    client.updateTokens(response.tokens);
+
+    await updateEnvFile(resolve(config.envFilePath ?? ".env"), {
+      POCKETBOOK_ACCESS_TOKEN: response.tokens.accessToken,
+      POCKETBOOK_REFRESH_TOKEN: response.tokens.refreshToken,
+    });
+
+    return true;
+  };
+  const withAuthRefresh = async <T extends { status: number; bodyPreview: unknown }>(
+    action: () => Promise<T>,
+  ): Promise<T> => {
+    const response = await action();
+    if (!isUnknownToken(response) || !(await refreshAuth())) {
+      return response;
+    }
+
+    return action();
+  };
 
   server.registerTool(
     "pocketbook_config",
@@ -62,6 +94,58 @@ export function registerPocketBookTools(server: McpServer, config: PocketBookCon
   );
 
   server.registerTool(
+    "pocketbook_refresh_token",
+    {
+      title: "Refresh PocketBook token",
+      description:
+        "Refresh PocketBook Cloud access credentials with /api/v1.0/auth/renew-token. By default, writes returned tokens back to the configured .env file.",
+      inputSchema: {
+        refreshToken: z
+          .string()
+          .min(1)
+          .optional()
+          .describe("Optional refresh token override. Defaults to POCKETBOOK_REFRESH_TOKEN."),
+        persist: z.boolean().default(true).describe("Write returned tokens to POCKETBOOK_ENV_FILE or .env."),
+      },
+    },
+    async ({ refreshToken, persist = true }) => {
+      const response = await client.renewToken(refreshToken);
+      const hasNewAccessToken = Boolean(response.tokens.accessToken);
+      const hasNewRefreshToken = Boolean(response.tokens.refreshToken);
+      const shouldPersist = persist && isOk(response.status) && hasNewAccessToken;
+      const envFilePath = resolve(config.envFilePath ?? ".env");
+
+      if (isOk(response.status) && hasNewAccessToken) {
+        client.updateTokens(response.tokens);
+      }
+
+      if (shouldPersist) {
+        await updateEnvFile(envFilePath, {
+          POCKETBOOK_ACCESS_TOKEN: response.tokens.accessToken,
+          POCKETBOOK_REFRESH_TOKEN: response.tokens.refreshToken,
+        });
+      }
+
+      return asJson({
+        ok: isOk(response.status),
+        status: response.status,
+        statusText: response.statusText,
+        persisted: shouldPersist,
+        envFilePath: shouldPersist ? envFilePath : null,
+        tokens: {
+          hasAccessToken: hasNewAccessToken,
+          hasRefreshToken: hasNewRefreshToken,
+          accessTokenLength: response.tokens.accessToken?.length ?? 0,
+          refreshTokenLength: response.tokens.refreshToken?.length ?? 0,
+          expiresIn: response.tokens.expiresIn ?? null,
+          tokenType: response.tokens.tokenType ?? null,
+        },
+        error: errorMessage(response.bodyPreview),
+      });
+    },
+  );
+
+  server.registerTool(
     "pocketbook_get",
     {
       title: "PocketBook GET",
@@ -73,7 +157,7 @@ export function registerPocketBookTools(server: McpServer, config: PocketBookCon
           .describe("Relative path such as /api/books or an absolute PocketBook URL."),
       },
     },
-    async ({ path }) => asJson(await client.get(path)),
+    async ({ path }) => asJson(await withAuthRefresh(() => client.get(path))),
   );
 
   server.registerTool(
@@ -84,7 +168,7 @@ export function registerPocketBookTools(server: McpServer, config: PocketBookCon
       inputSchema: {},
     },
     async () => {
-      const response = await client.user();
+      const response = await withAuthRefresh(() => client.user());
       return asJson({
         ok: isOk(response.status),
         status: response.status,
@@ -104,7 +188,7 @@ export function registerPocketBookTools(server: McpServer, config: PocketBookCon
       },
     },
     async ({ offset, limit }) => {
-      const response = await client.books(offset, limit);
+      const response = await withAuthRefresh(() => client.books(offset, limit));
       return asJson({
         ok: isOk(response.status),
         status: response.status,
@@ -121,7 +205,7 @@ export function registerPocketBookTools(server: McpServer, config: PocketBookCon
       inputSchema: {},
     },
     async () => {
-      const response = await client.booksInfo();
+      const response = await withAuthRefresh(() => client.booksInfo());
       return asJson({
         ok: isOk(response.status),
         status: response.status,
@@ -142,7 +226,7 @@ export function registerPocketBookTools(server: McpServer, config: PocketBookCon
       },
     },
     async ({ filePath, remoteName, contentType }) => {
-      const response = await client.uploadFile(filePath, remoteName, contentType);
+      const response = await withAuthRefresh(() => client.uploadFile(filePath, remoteName, contentType));
       return asJson({
         ok: isOk(response.status),
         status: response.status,
@@ -170,7 +254,19 @@ export function registerPocketBookTools(server: McpServer, config: PocketBookCon
       },
     },
     async ({ files }) => {
-      const results = await client.uploadFiles(files);
+      const initialResults = await client.uploadFiles(files);
+      const hasUnknownToken = initialResults.some((result) => result.response && isUnknownToken(result.response));
+      const results = hasUnknownToken && (await refreshAuth())
+        ? mergeUploadResults(
+            initialResults,
+            await client.uploadFiles(
+              files.filter((_, index) => !initialResults[index]?.ok),
+            ),
+            initialResults
+              .map((result, index) => (!result.ok ? index : -1))
+              .filter((index): index is number => index >= 0),
+          )
+        : initialResults;
       return asJson({
         ok: results.every((result) => result.ok),
         total: results.length,
@@ -238,4 +334,79 @@ function unique(values: Array<string | undefined>): string[] {
 
 function isOk(status: number): boolean {
   return status >= 200 && status < 300;
+}
+
+function isUnknownToken(response: { status: number; bodyPreview: unknown }): boolean {
+  const body = response.bodyPreview;
+  return response.status === 403 && isRecord(body) && body.error_code === 223;
+}
+
+function mergeUploadResults(
+  initialResults: BatchUploadResult[],
+  retriedResults: BatchUploadResult[],
+  failedIndexes: number[],
+): BatchUploadResult[] {
+  const results = [...initialResults];
+
+  for (let retryIndex = 0; retryIndex < failedIndexes.length; retryIndex += 1) {
+    const originalIndex = failedIndexes[retryIndex];
+    const retriedResult = retriedResults[retryIndex];
+    if (retriedResult) {
+      results[originalIndex] = retriedResult;
+    }
+  }
+
+  return results;
+}
+
+async function updateEnvFile(
+  filePath: string,
+  values: Record<string, string | undefined>,
+): Promise<void> {
+  let text = "";
+  try {
+    text = await readFile(filePath, "utf8");
+  } catch (error) {
+    if (!isMissingFile(error)) {
+      throw error;
+    }
+  }
+
+  for (const [key, value] of Object.entries(values)) {
+    if (!value) {
+      continue;
+    }
+
+    const line = `${key}=${value}`;
+    const pattern = new RegExp(`^${escapeRegExp(key)}=.*$`, "m");
+    text = pattern.test(text)
+      ? text.replace(pattern, line)
+      : `${text.replace(/\s*$/, "")}\n${line}\n`;
+  }
+
+  await writeFile(filePath, text, "utf8");
+}
+
+function isMissingFile(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
+
+function errorMessage(body: unknown): string | null {
+  if (body && typeof body === "object" && "error_msg" in body && typeof body.error_msg === "string") {
+    return body.error_msg;
+  }
+
+  if (body && typeof body === "object" && "message" in body && typeof body.message === "string") {
+    return body.message;
+  }
+
+  return null;
 }
