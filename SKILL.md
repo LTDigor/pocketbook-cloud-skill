@@ -58,6 +58,18 @@ npm run pocketbook -- refresh-token
 
 3. If refresh fails with an invalid refresh token, stop and tell the user that PocketBook credentials need to be replaced from a fresh authenticated session. Do not open the UI unless the user allows it.
 
+## Token setup and renewal
+
+To configure a fresh checkout, copy `POCKETBOOK_ACCESS_TOKEN` and `POCKETBOOK_REFRESH_TOKEN` from an authenticated PocketBook Cloud browser session or authenticated API request. Set `POCKETBOOK_WEB_CLIENT_ID=qNAx1RDb`, the web client ID used by the public PocketBook Cloud browser app.
+
+When a refresh token is valid, update saved credentials with:
+
+```bash
+npm run pocketbook -- refresh-token
+```
+
+The command persists renewed tokens to `POCKETBOOK_ENV_FILE` when set, otherwise to the local `.env`. Use `--no-persist` only for a dry run. Treat full command output as sensitive because some PocketBook API responses include signed URLs with `access_token` query parameters.
+
 ## Commands
 
 - `config` - show non-secret configuration.

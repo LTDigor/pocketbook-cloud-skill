@@ -22,7 +22,7 @@ cp .env.example .env
 
 ## Authentication
 
-Use values copied from authenticated PocketBook Cloud requests:
+Use values copied from an authenticated PocketBook Cloud session:
 
 ```bash
 POCKETBOOK_ACCESS_TOKEN=...
@@ -42,6 +42,39 @@ POCKETBOOK_COOKIE_FILE=/absolute/path/to/cookie.txt
 ```
 
 Do not commit `.env` or cookie files.
+
+### Getting tokens
+
+1. Sign in to `https://cloud.pocketbook.digital` in a browser.
+2. Open browser developer tools and inspect the app storage or an authenticated API request.
+3. Copy the current `access_token` and `refresh_token` values into `.env`.
+4. Set `POCKETBOOK_WEB_CLIENT_ID=qNAx1RDb`. This is the web client ID used by the public PocketBook Cloud browser app.
+5. Verify the configuration:
+
+```bash
+npm run pocketbook -- config
+npm run pocketbook -- user
+```
+
+On macOS with Chrome, the PocketBook Cloud web app may store the signed-in session in Chrome Local Storage under the `cloud.pocketbook.digital` origin. If you extract values from Chrome's local storage files, copy only `access_token` and `refresh_token` into `.env`; do not commit or print those values.
+
+### Updating tokens
+
+Use the refresh command while the saved refresh token is still valid:
+
+```bash
+npm run pocketbook -- refresh-token
+```
+
+By default, the command persists renewed credentials to `POCKETBOOK_ENV_FILE` when it is set, otherwise to the local `.env` file. To test refresh without writing updated tokens:
+
+```bash
+npm run pocketbook -- refresh-token --no-persist
+```
+
+If an authenticated command returns `Unknown token` or `error_code: 223`, the CLI retries once after a successful refresh. If refresh returns `Unknown token` or `Invalid refresh token`, sign in to PocketBook Cloud again and replace `POCKETBOOK_ACCESS_TOKEN`, `POCKETBOOK_REFRESH_TOKEN`, and `POCKETBOOK_WEB_CLIENT_ID` in `.env`.
+
+Some API responses include signed URLs with `access_token` query parameters. Treat full command output as sensitive when sharing logs.
 
 ## Commands
 
