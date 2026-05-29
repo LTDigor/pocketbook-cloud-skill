@@ -72,7 +72,24 @@ By default, the command persists renewed credentials to `POCKETBOOK_ENV_FILE` wh
 npm run pocketbook -- refresh-token --no-persist
 ```
 
-If an authenticated command returns `Unknown token` or `error_code: 223`, the CLI retries once after a successful refresh. If refresh returns `Unknown token` or `Invalid refresh token`, sign in to PocketBook Cloud again and replace `POCKETBOOK_ACCESS_TOKEN`, `POCKETBOOK_REFRESH_TOKEN`, and `POCKETBOOK_WEB_CLIENT_ID` in `.env`.
+If an authenticated command returns `Unknown token` or `error_code: 223`, the CLI retries once after a successful refresh.
+
+If refresh returns `Unknown token` or `Invalid refresh token`, get a fresh token pair from the browser:
+
+1. Open `https://cloud.pocketbook.digital` in a browser and sign in again.
+2. Open developer tools.
+3. In the Application or Storage panel, inspect Local Storage for the `https://cloud.pocketbook.digital` origin, or inspect an authenticated API request in the Network panel.
+4. Copy the fresh `access_token` and `refresh_token` values into `.env`.
+5. Keep `POCKETBOOK_WEB_CLIENT_ID=qNAx1RDb`.
+6. Verify the recovered credentials:
+
+```bash
+npm run pocketbook -- config
+npm run pocketbook -- user
+npm run pocketbook -- refresh-token
+```
+
+On macOS with Chrome, the same values may be present in Chrome Local Storage LevelDB files for the signed-in profile, under the `cloud.pocketbook.digital` origin. Treat those files as sensitive and copy only the token values needed for `.env`.
 
 Some API responses include signed URLs with `access_token` query parameters. Treat full command output as sensitive when sharing logs.
 

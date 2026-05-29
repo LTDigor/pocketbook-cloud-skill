@@ -68,7 +68,11 @@ When a refresh token is valid, update saved credentials with:
 npm run pocketbook -- refresh-token
 ```
 
-The command persists renewed tokens to `POCKETBOOK_ENV_FILE` when set, otherwise to the local `.env`. Use `--no-persist` only for a dry run. Treat full command output as sensitive because some PocketBook API responses include signed URLs with `access_token` query parameters.
+The command persists renewed tokens to `POCKETBOOK_ENV_FILE` when set, otherwise to the local `.env`. Use `--no-persist` only for a dry run.
+
+If refresh returns `Unknown token` or `Invalid refresh token`, recover through the browser only when the user allows it: sign in to `https://cloud.pocketbook.digital`, copy fresh `access_token` and `refresh_token` values from the authenticated browser session storage or an authenticated API request, keep `POCKETBOOK_WEB_CLIENT_ID=qNAx1RDb`, write the values to `.env`, and verify with `npm run pocketbook -- user` followed by `npm run pocketbook -- refresh-token`.
+
+Treat full command output as sensitive because some PocketBook API responses include signed URLs with `access_token` query parameters.
 
 ## Commands
 
