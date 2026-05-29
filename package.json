@@ -1,36 +1,34 @@
 {
-  "name": "pocketbook-mcp",
+  "name": "pocketbook-cloud-skill",
   "version": "0.1.0",
-  "description": "MCP server for exploring and integrating with a PocketBook account.",
+  "description": "Codex skill support scripts for PocketBook Cloud workflows.",
   "type": "module",
   "bin": {
-    "pocketbook-mcp": "./dist/index.js"
+    "pocketbook-cloud": "./dist/cli.js"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/LTDigor/pocketbook-mcp.git"
+    "url": "git+https://github.com/LTDigor/pocketbook-cloud-skill.git"
   },
   "bugs": {
-    "url": "https://github.com/LTDigor/pocketbook-mcp/issues"
+    "url": "https://github.com/LTDigor/pocketbook-cloud-skill/issues"
   },
-  "homepage": "https://github.com/LTDigor/pocketbook-mcp#readme",
+  "homepage": "https://github.com/LTDigor/pocketbook-cloud-skill#readme",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "dev": "tsx src/index.ts",
-    "start": "node dist/index.js",
+    "pocketbook": "tsx src/cli.ts",
+    "start": "node dist/cli.js",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "keywords": [
-    "mcp",
+    "codex-skill",
     "pocketbook"
   ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "dotenv": "^17.4.2",
-    "zod": "^4.4.3"
+    "dotenv": "^17.4.2"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",

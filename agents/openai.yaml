@@ -1,0 +1,4 @@
+interface:
+  display_name: "PocketBook Cloud"
+  short_description: "Manage PocketBook Cloud books and tokens"
+  default_prompt: "Use $pocketbook-cloud to list my PocketBook Cloud books."
