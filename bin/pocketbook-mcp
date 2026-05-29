@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-cd "/Users/alfa/Documents/New project 2"
-exec node dist/index.js

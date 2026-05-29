@@ -191,7 +191,7 @@ export class PocketBookClient {
   ): Promise<PocketBookResponse> {
     const headers: Record<string, string> = {
       accept: "application/json, text/plain, */*",
-      "user-agent": "pocketbook-mcp/0.1",
+      "user-agent": "pocketbook-cloud-skill/0.1",
       "cache-control": "no-cache",
     };
 
