@@ -24,7 +24,6 @@ export type NormalizedBooksResult = {
   limit: number;
   count: number;
   books: NormalizedBook[];
-  rawContainerKeys: string[];
 };
 
 export function normalizeUserPayload(payload: unknown): NormalizedUser {
@@ -35,7 +34,7 @@ export function normalizeUserPayload(payload: unknown): NormalizedUser {
     email: pickString(record, ["email", "login", "username", "user_email"]),
     name: pickString(record, ["name", "full_name", "display_name", "first_name"]),
     language: pickString(record, ["language", "lang", "locale"]),
-    raw: record,
+    raw: sanitizeRecord(record),
   };
 }
 
@@ -50,19 +49,18 @@ export function normalizeBooksPayload(payload: unknown, offset: number, limit: n
     limit,
     count: books.length,
     books,
-    rawContainerKeys: Object.keys(container).sort(),
   };
 }
 
 export function normalizeStatsPayload(payload: unknown): Record<string, unknown> {
-  return unwrapRecord(payload);
+  return sanitizeRecord(unwrapRecord(payload));
 }
 
 export function normalizeUploadPayload(payload: unknown, remoteName: string | undefined): Record<string, unknown> {
   const record = unwrapRecord(payload);
   return {
     remoteName: remoteName ?? null,
-    ...record,
+    ...sanitizeRecord(record),
   };
 }
 
@@ -79,8 +77,37 @@ function normalizeBook(value: unknown): NormalizedBook {
     size: pickNumber(record, ["size", "file_size", "fileSize"]),
     progress: pickNumber(record, ["progress", "reading_progress", "readingProgress", "percent"]),
     favorite: pickBoolean(record, ["favorite", "is_favorite", "isFavorite"]),
-    raw: record,
+    raw: sanitizeRecord(record),
   };
+}
+
+const REDACTED = "[redacted]";
+const SENSITIVE_KEY_PATTERN = /(^|_|-)(access[_-]?token|refresh[_-]?token|token|password|authorization|cookie|secret)($|_|-)/i;
+
+function sanitizeRecord(record: Record<string, unknown>): Record<string, unknown> {
+  return sanitizeValue(record) as Record<string, unknown>;
+}
+
+function sanitizeValue(value: unknown, key = ""): unknown {
+  if (SENSITIVE_KEY_PATTERN.test(key)) {
+    return REDACTED;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeValue(item));
+  }
+
+  if (isRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([entryKey, entryValue]) => [entryKey, sanitizeValue(entryValue, entryKey)]),
+    );
+  }
+
+  if (typeof value === "string") {
+    return value.replace(/([?&](?:access_token|refresh_token|token)=)[^&]+/gi, `$1${REDACTED}`);
+  }
+
+  return value;
 }
 
 function extractArray(payload: unknown): unknown[] {

@@ -60,7 +60,10 @@ describe("PocketBook skill CLI", () => {
         `POCKETBOOK_BASE_URL=${baseUrl}`,
         "POCKETBOOK_ACCESS_TOKEN=external-access",
         "POCKETBOOK_REFRESH_TOKEN=external-refresh",
+        "POCKETBOOK_LOGIN=reader@example.test",
+        "POCKETBOOK_PASSWORD=secret-password",
         "POCKETBOOK_WEB_CLIENT_ID=web-client-123",
+        "POCKETBOOK_WEB_CLIENT_SECRET=web-secret-123",
         `POCKETBOOK_ENV_FILE=${envFilePath}`,
         "",
       ].join("\n"),
@@ -81,11 +84,16 @@ describe("PocketBook skill CLI", () => {
       baseUrl,
       hasAccessToken: true,
       hasRefreshToken: true,
+      hasUsername: true,
+      hasPassword: true,
       hasWebClientId: true,
+      hasWebClientSecret: true,
       hasEnvFilePath: true,
     });
     expect(JSON.stringify(result)).not.toContain("external-access");
     expect(JSON.stringify(result)).not.toContain("external-refresh");
+    expect(JSON.stringify(result)).not.toContain("reader@example.test");
+    expect(JSON.stringify(result)).not.toContain("secret-password");
   });
 
   it("runs status and generic GET commands with PocketBook auth headers", async () => {
@@ -233,6 +241,45 @@ describe("PocketBook skill CLI", () => {
     );
   });
 
+  it("logs in with env username/password and persists returned tokens", async () => {
+    await expect(runCli(["login", "--language", "ru"])).resolves.toMatchObject({
+      ok: true,
+      status: 200,
+      persisted: true,
+      envFilePath,
+      provider: {
+        alias: "pbook",
+        shopId: "1",
+        name: "PocketBook",
+      },
+      tokens: {
+        hasAccessToken: true,
+        hasRefreshToken: true,
+        accessTokenLength: "login-access-token".length,
+        refreshTokenLength: "login-refresh-token".length,
+        expiresIn: 7200,
+        tokenType: "Bearer",
+      },
+    });
+
+    const envText = await readFile(envFilePath, "utf8");
+    expect(envText).toContain("POCKETBOOK_ACCESS_TOKEN=login-access-token");
+    expect(envText).toContain("POCKETBOOK_REFRESH_TOKEN=login-refresh-token");
+    expect(requests).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          method: "GET",
+          url: "/api/v1.0/auth/login?username=reader%40example.test&client_id=web-client-123&client_secret=web-secret-123&language=ru",
+        }),
+        expect.objectContaining({
+          method: "POST",
+          url: "/api/v1.0/auth/login/pbook",
+          body: "shop_id=1&username=reader%40example.test&password=secret-password&client_id=web-client-123&client_secret=web-secret-123&grant_type=password&language=ru",
+        }),
+      ]),
+    );
+  });
+
   it("refreshes and retries an authenticated command once after Unknown token", async () => {
     await expect(runCli(["get", "--path", "/api/requires-refresh"])).resolves.toMatchObject({
       status: 200,
@@ -341,6 +388,23 @@ async function handleRequest(
     writeJson(response, {
       access_token: "new-access-token",
       refresh_token: "new-refresh-token",
+      token_type: "Bearer",
+      expires_in: 7200,
+    });
+    return;
+  }
+
+  if (url.pathname === "/api/v1.0/auth/login" && recorded.method === "GET") {
+    writeJson(response, {
+      providers: [{ alias: "pbook", shop_id: 1, name: "PocketBook" }],
+    });
+    return;
+  }
+
+  if (url.pathname === "/api/v1.0/auth/login/pbook" && recorded.method === "POST") {
+    writeJson(response, {
+      access_token: "login-access-token",
+      refresh_token: "login-refresh-token",
       token_type: "Bearer",
       expires_in: 7200,
     });

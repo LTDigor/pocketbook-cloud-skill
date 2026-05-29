@@ -37,6 +37,23 @@ describe("normalizers", () => {
     });
   });
 
+  it("redacts sensitive fields from raw normalized output", () => {
+    const user = normalizeUserPayload({
+      email: "reader@example.test",
+      internal_account: {
+        password: "secret",
+      },
+      download_url: "https://example.test/book.epub?access_token=secret-token&format=epub",
+    });
+
+    expect(user.raw).toMatchObject({
+      internal_account: {
+        password: "[redacted]",
+      },
+      download_url: "https://example.test/book.epub?access_token=[redacted]&format=epub",
+    });
+  });
+
   it("normalizes book arrays from a books container", () => {
     const result = normalizeBooksPayload(
       {

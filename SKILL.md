@@ -28,9 +28,18 @@ Expected variables:
 - `POCKETBOOK_WEB_CLIENT_ID`
 - `POCKETBOOK_ENV_FILE` absolute path to the `.env` file to update after token refresh
 
+Login variables:
+
+- `POCKETBOOK_LOGIN` or `POCKETBOOK_USERNAME`
+- `POCKETBOOK_PASSWORD`
+
 Optional variables:
 
 - `POCKETBOOK_BASE_URL`, default `https://cloud.pocketbook.digital`
+- `POCKETBOOK_WEB_CLIENT_SECRET`, default public web client secret
+- `POCKETBOOK_LANGUAGE`
+- `POCKETBOOK_PROVIDER_ALIAS`
+- `POCKETBOOK_SHOP_ID`
 - `POCKETBOOK_COOKIE_HEADER`
 - `POCKETBOOK_COOKIE_FILE`
 - `POCKETBOOK_PROFILE_PATH`
@@ -56,11 +65,27 @@ npm run pocketbook -- refresh-token
 
 `refresh-token` calls `POST /api/v1.0/auth/renew-token`, updates the in-process credentials, and writes new tokens to `POCKETBOOK_ENV_FILE` or `.env`.
 
-3. If refresh fails with an invalid refresh token, stop and tell the user that PocketBook credentials need to be replaced from a fresh authenticated session. Do not open the UI unless the user allows it.
+If token refresh is not usable but `POCKETBOOK_LOGIN`/`POCKETBOOK_USERNAME` and `POCKETBOOK_PASSWORD` are configured, log in without UI:
+
+```bash
+npm run pocketbook -- login
+```
+
+`login` discovers auth providers with `GET /api/v1.0/auth/login`, posts the password to the selected provider, updates in-process credentials, and writes returned tokens to `POCKETBOOK_ENV_FILE` or `.env`. If multiple providers are available, set `POCKETBOOK_PROVIDER_ALIAS` and/or `POCKETBOOK_SHOP_ID`.
+
+After `login` succeeds, verify the persisted token pair with `npm run pocketbook -- user` and `npm run pocketbook -- refresh-token`.
+
+3. If both refresh and login fail, stop and report the error. Use the browser only when the user allows UI recovery.
 
 ## Token setup and renewal
 
-To configure a fresh checkout, copy `POCKETBOOK_ACCESS_TOKEN` and `POCKETBOOK_REFRESH_TOKEN` from an authenticated PocketBook Cloud browser session or authenticated API request. Set `POCKETBOOK_WEB_CLIENT_ID=qNAx1RDb`, the web client ID used by the public PocketBook Cloud browser app.
+To configure a fresh checkout, either copy `POCKETBOOK_ACCESS_TOKEN` and `POCKETBOOK_REFRESH_TOKEN` from an authenticated PocketBook Cloud session, or set `POCKETBOOK_LOGIN`/`POCKETBOOK_USERNAME` and `POCKETBOOK_PASSWORD` and run:
+
+```bash
+npm run pocketbook -- login
+```
+
+Set `POCKETBOOK_WEB_CLIENT_ID=qNAx1RDb`, the web client ID used by the public PocketBook Cloud browser app. `POCKETBOOK_WEB_CLIENT_SECRET` can usually be omitted because the CLI has the public web client secret fallback used by the web app.
 
 When a refresh token is valid, update saved credentials with:
 
@@ -70,7 +95,7 @@ npm run pocketbook -- refresh-token
 
 The command persists renewed tokens to `POCKETBOOK_ENV_FILE` when set, otherwise to the local `.env`. Use `--no-persist` only for a dry run.
 
-If refresh returns `Unknown token` or `Invalid refresh token`, recover through the browser only when the user allows it: sign in to `https://cloud.pocketbook.digital`, copy fresh `access_token` and `refresh_token` values from the authenticated browser session storage or an authenticated API request, keep `POCKETBOOK_WEB_CLIENT_ID=qNAx1RDb`, write the values to `.env`, and verify with `npm run pocketbook -- user` followed by `npm run pocketbook -- refresh-token`.
+If refresh returns `Unknown token` or `Invalid refresh token`, prefer `npm run pocketbook -- login` when login/password env variables are configured. Recover through the browser only when login is unavailable or fails and the user allows UI recovery: sign in to `https://cloud.pocketbook.digital`, copy fresh `access_token` and `refresh_token` values from the authenticated browser session storage or an authenticated API request, keep `POCKETBOOK_WEB_CLIENT_ID=qNAx1RDb`, write the values to `.env`, and verify with `npm run pocketbook -- user` followed by `npm run pocketbook -- refresh-token`.
 
 Treat full command output as sensitive because some PocketBook API responses include signed URLs with `access_token` query parameters.
 
@@ -78,6 +103,7 @@ Treat full command output as sensitive because some PocketBook API responses inc
 
 - `config` - show non-secret configuration.
 - `status` - request `/`.
+- `login [--username LOGIN] [--password PASSWORD] [--provider-alias ALIAS] [--shop-id ID] [--language LANG] [--no-persist]` - log in with env or option credentials and persist returned tokens.
 - `refresh-token [--refresh-token TOKEN] [--no-persist]` - renew credentials.
 - `get --path /api/...` - authenticated GET for API discovery.
 - `user` - normalized `/api/v1.0/user`.

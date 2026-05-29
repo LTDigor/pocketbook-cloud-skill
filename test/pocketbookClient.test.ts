@@ -28,7 +28,10 @@ describe("PocketBookClient", () => {
       baseUrl: "https://cloud.pocketbook.digital",
       hasAccessToken: true,
       hasRefreshToken: false,
+      hasUsername: false,
+      hasPassword: false,
       hasWebClientId: true,
+      hasWebClientSecret: false,
       hasCookie: true,
       hasEnvFilePath: false,
       configuredPaths: {
@@ -87,6 +90,67 @@ describe("PocketBookClient", () => {
 
     await expect(client.renewToken()).rejects.toThrow("POCKETBOOK_REFRESH_TOKEN is required");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("discovers auth providers and logs in with username and password", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          providers: [{ alias: "pbook", shop_id: 1, name: "PocketBook" }],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          access_token: "login-access",
+          refresh_token: "login-refresh",
+          token_type: "Bearer",
+          expires_in: 7200,
+        }),
+      );
+
+    const client = new PocketBookClient({
+      baseUrl: "https://cloud.pocketbook.digital",
+      webClientId: "client-id",
+      webClientSecret: "client-secret",
+    });
+    const providers = await client.authProviders("reader@example.test", "ru");
+
+    expect(providers).toMatchObject([{ alias: "pbook", shopId: "1", name: "PocketBook" }]);
+    await expect(
+      client.login({
+        username: "reader@example.test",
+        password: "secret-password",
+        provider: providers[0],
+        language: "ru",
+      }),
+    ).resolves.toMatchObject({
+      status: 200,
+      tokens: {
+        accessToken: "login-access",
+        refreshToken: "login-refresh",
+        tokenType: "Bearer",
+        expiresIn: 7200,
+      },
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      new URL(
+        "https://cloud.pocketbook.digital/api/v1.0/auth/login?username=reader%40example.test&client_id=client-id&client_secret=client-secret&language=ru",
+      ),
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      new URL("https://cloud.pocketbook.digital/api/v1.0/auth/login/pbook"),
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "content-type": "application/x-www-form-urlencoded",
+        }),
+        body: "shop_id=1&username=reader%40example.test&password=secret-password&client_id=client-id&client_secret=client-secret&grant_type=password&language=ru",
+      }),
+    );
   });
 
   it("sends PocketBook auth headers on GET requests", async () => {

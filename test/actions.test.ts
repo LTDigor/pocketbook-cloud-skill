@@ -230,6 +230,61 @@ describe("createPocketBookActions", () => {
     await rm(dir, { recursive: true, force: true });
   });
 
+  it("logs in with env credentials and persists returned tokens", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          providers: [{ alias: "pbook", shop_id: 1, name: "PocketBook" }],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          access_token: "login-access",
+          refresh_token: "login-refresh",
+          token_type: "Bearer",
+          expires_in: 7200,
+        }),
+      );
+    const dir = await mkdtemp(join(tmpdir(), "pocketbook-action-login-"));
+    const envFilePath = join(dir, ".env");
+    await writeFile(envFilePath, "POCKETBOOK_BASE_URL=https://cloud.pocketbook.digital\n");
+    const actions = createPocketBookActions({
+      baseUrl: "https://cloud.pocketbook.digital",
+      username: "reader@example.test",
+      password: "secret-password",
+      envFilePath,
+      webClientId: "client-id",
+      webClientSecret: "client-secret",
+      language: "ru",
+    });
+
+    await expect(actions.login()).resolves.toMatchObject({
+      ok: true,
+      status: 200,
+      persisted: true,
+      provider: {
+        alias: "pbook",
+        shopId: "1",
+        name: "PocketBook",
+      },
+      tokens: {
+        hasAccessToken: true,
+        hasRefreshToken: true,
+        accessTokenLength: 12,
+        refreshTokenLength: 13,
+        expiresIn: 7200,
+      },
+    });
+    await expect(import("node:fs/promises").then(({ readFile }) => readFile(envFilePath, "utf8"))).resolves.toContain(
+      "POCKETBOOK_ACCESS_TOKEN=login-access",
+    );
+    await expect(import("node:fs/promises").then(({ readFile }) => readFile(envFilePath, "utf8"))).resolves.toContain(
+      "POCKETBOOK_REFRESH_TOKEN=login-refresh",
+    );
+
+    await rm(dir, { recursive: true, force: true });
+  });
+
   it("refreshes tokens in memory without persisting when disabled", async () => {
     fetchMock
       .mockResolvedValueOnce(

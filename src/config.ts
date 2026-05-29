@@ -4,7 +4,13 @@ export type PocketBookConfig = {
   baseUrl: string;
   accessToken?: string;
   refreshToken?: string;
+  username?: string;
+  password?: string;
+  providerAlias?: string;
+  shopId?: string;
+  language?: string;
   webClientId?: string;
+  webClientSecret?: string;
   cookieHeader?: string;
   envFilePath?: string;
   booksPath?: string;
@@ -23,7 +29,13 @@ export async function loadConfig(): Promise<PocketBookConfig> {
     baseUrl: normalizeBaseUrl(process.env.POCKETBOOK_BASE_URL || DEFAULT_BASE_URL),
     accessToken: emptyToUndefined(process.env.POCKETBOOK_ACCESS_TOKEN),
     refreshToken: emptyToUndefined(process.env.POCKETBOOK_REFRESH_TOKEN),
+    username: emptyToUndefined(process.env.POCKETBOOK_USERNAME) ?? emptyToUndefined(process.env.POCKETBOOK_LOGIN),
+    password: emptyToUndefined(process.env.POCKETBOOK_PASSWORD),
+    providerAlias: emptyToUndefined(process.env.POCKETBOOK_PROVIDER_ALIAS),
+    shopId: emptyToUndefined(process.env.POCKETBOOK_SHOP_ID),
+    language: emptyToUndefined(process.env.POCKETBOOK_LANGUAGE),
     webClientId: emptyToUndefined(process.env.POCKETBOOK_WEB_CLIENT_ID),
+    webClientSecret: emptyToUndefined(process.env.POCKETBOOK_WEB_CLIENT_SECRET),
     cookieHeader,
     envFilePath: emptyToUndefined(process.env.POCKETBOOK_ENV_FILE),
     booksPath: emptyToUndefined(process.env.POCKETBOOK_BOOKS_PATH),

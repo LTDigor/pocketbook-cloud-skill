@@ -7,6 +7,7 @@ import type { UploadFileInput } from "./pocketbookClient.js";
 const COMMANDS = [
   "config",
   "status",
+  "login",
   "refresh-token",
   "get",
   "user",
@@ -47,6 +48,15 @@ async function runCommand(
       return actions.config();
     case "status":
       return actions.status();
+    case "login":
+      return actions.login({
+        username: stringOption(options, "username") ?? stringOption(options, "login"),
+        password: stringOption(options, "password"),
+        providerAlias: stringOption(options, "provider-alias"),
+        shopId: stringOption(options, "shop-id"),
+        language: stringOption(options, "language"),
+        persist: !options.has("no-persist"),
+      });
     case "refresh-token":
       return actions.refreshToken({
         refreshToken: stringOption(options, "refresh-token"),
@@ -182,6 +192,7 @@ function printUsage(command: string | undefined): void {
 Commands:
   config
   status
+  login [--username LOGIN] [--password PASSWORD] [--provider-alias ALIAS] [--shop-id ID] [--language LANG] [--no-persist]
   refresh-token [--refresh-token TOKEN] [--no-persist]
   get --path /api/v1.0/user
   user

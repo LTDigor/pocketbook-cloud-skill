@@ -38,10 +38,17 @@ const DEFAULT_DEVICE_PATHS = [
   "/api/user/devices",
 ];
 
-export type PocketBookActions = ReturnType<typeof createPocketBookActions>;
-
 export function createPocketBookActions(config: PocketBookConfig) {
   const client = new PocketBookClient(config);
+
+  const persistTokens = async (tokens: { accessToken?: string; refreshToken?: string }): Promise<string> => {
+    const envFilePath = resolve(config.envFilePath ?? ".env");
+    await updateEnvFile(envFilePath, {
+      POCKETBOOK_ACCESS_TOKEN: tokens.accessToken,
+      POCKETBOOK_REFRESH_TOKEN: tokens.refreshToken,
+    });
+    return envFilePath;
+  };
 
   const refreshAuth = async (): Promise<boolean> => {
     if (!config.refreshToken) {
@@ -55,10 +62,7 @@ export function createPocketBookActions(config: PocketBookConfig) {
     }
 
     client.updateTokens(response.tokens);
-    await updateEnvFile(resolve(config.envFilePath ?? ".env"), {
-      POCKETBOOK_ACCESS_TOKEN: response.tokens.accessToken,
-      POCKETBOOK_REFRESH_TOKEN: response.tokens.refreshToken,
-    });
+    await persistTokens(response.tokens);
 
     return true;
   };
@@ -89,10 +93,7 @@ export function createPocketBookActions(config: PocketBookConfig) {
       }
 
       if (shouldPersist) {
-        await updateEnvFile(envFilePath, {
-          POCKETBOOK_ACCESS_TOKEN: response.tokens.accessToken,
-          POCKETBOOK_REFRESH_TOKEN: response.tokens.refreshToken,
-        });
+        await persistTokens(response.tokens);
       }
 
       return {
@@ -101,6 +102,72 @@ export function createPocketBookActions(config: PocketBookConfig) {
         statusText: response.statusText,
         persisted: shouldPersist,
         envFilePath: shouldPersist ? envFilePath : null,
+        tokens: {
+          hasAccessToken: hasNewAccessToken,
+          hasRefreshToken: hasNewRefreshToken,
+          accessTokenLength: response.tokens.accessToken?.length ?? 0,
+          refreshTokenLength: response.tokens.refreshToken?.length ?? 0,
+          expiresIn: response.tokens.expiresIn ?? null,
+          tokenType: response.tokens.tokenType ?? null,
+        },
+        error: errorMessage(response.bodyPreview),
+      };
+    },
+    login: async (
+      input: {
+        username?: string;
+        password?: string;
+        providerAlias?: string;
+        shopId?: string;
+        language?: string;
+        persist?: boolean;
+      } = {},
+    ) => {
+      const username = input.username ?? config.username;
+      const password = input.password ?? config.password;
+      const providerAlias = input.providerAlias ?? config.providerAlias;
+      const shopId = input.shopId ?? config.shopId;
+      const language = input.language ?? config.language;
+      const envFilePath = resolve(config.envFilePath ?? ".env");
+
+      if (!username?.trim()) {
+        throw new Error("POCKETBOOK_LOGIN or POCKETBOOK_USERNAME is required to log in.");
+      }
+      if (!password) {
+        throw new Error("POCKETBOOK_PASSWORD is required to log in.");
+      }
+
+      const providers = await client.authProviders(username, language);
+      const provider = selectAuthProvider(providers, { providerAlias, shopId });
+      const response = await client.login({
+        username,
+        password,
+        provider,
+        language,
+      });
+      const hasNewAccessToken = Boolean(response.tokens.accessToken);
+      const hasNewRefreshToken = Boolean(response.tokens.refreshToken);
+      const shouldPersist = (input.persist ?? true) && isOk(response.status) && hasNewAccessToken;
+
+      if (isOk(response.status) && hasNewAccessToken) {
+        client.updateTokens(response.tokens);
+      }
+
+      if (shouldPersist) {
+        await persistTokens(response.tokens);
+      }
+
+      return {
+        ok: isOk(response.status),
+        status: response.status,
+        statusText: response.statusText,
+        persisted: shouldPersist,
+        envFilePath: shouldPersist ? envFilePath : null,
+        provider: {
+          alias: provider.alias ?? null,
+          shopId: provider.shopId ?? null,
+          name: provider.name ?? null,
+        },
         tokens: {
           hasAccessToken: hasNewAccessToken,
           hasRefreshToken: hasNewRefreshToken,
@@ -181,6 +248,32 @@ export function createPocketBookActions(config: PocketBookConfig) {
     probeBooks: () => client.probe(unique([config.booksPath, ...DEFAULT_BOOK_PATHS])),
     probeDevices: () => client.probe(unique([config.devicesPath, ...DEFAULT_DEVICE_PATHS])),
   };
+}
+
+function selectAuthProvider(
+  providers: Array<{ alias?: string; shopId?: string; name?: string; raw: Record<string, unknown> }>,
+  selector: { providerAlias?: string; shopId?: string },
+) {
+  if (providers.length === 0) {
+    throw new Error("PocketBook did not return any auth providers for this login.");
+  }
+
+  const alias = selector.providerAlias?.trim();
+  const shopId = selector.shopId?.trim();
+  const selected = providers.find((provider) => {
+    const aliasMatches = !alias || provider.alias === alias;
+    const shopMatches = !shopId || provider.shopId === shopId;
+    return aliasMatches && shopMatches;
+  });
+
+  if (!selected) {
+    const available = providers
+      .map((provider) => [provider.alias, provider.shopId, provider.name].filter(Boolean).join("/"))
+      .join(", ");
+    throw new Error(`No PocketBook auth provider matched the configured selector. Available providers: ${available}`);
+  }
+
+  return selected;
 }
 
 function unique(values: Array<string | undefined>): string[] {

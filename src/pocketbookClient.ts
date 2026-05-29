@@ -41,8 +41,34 @@ export type TokenRefreshResult = PocketBookResponse & {
   };
 };
 
+export type AuthProvider = {
+  alias?: string;
+  shopId?: string;
+  name?: string;
+  id?: string;
+  raw: Record<string, unknown>;
+};
+
+export type LoginInput = {
+  username: string;
+  password: string;
+  provider: AuthProvider;
+  language?: string;
+};
+
+export type LoginResult = PocketBookResponse & {
+  tokens: {
+    accessToken?: string;
+    refreshToken?: string;
+    expiresIn?: number;
+    tokenType?: string;
+  };
+};
+
 const JSON_PREVIEW_LIMIT = 60_000;
 const TEXT_PREVIEW_LIMIT = 12_000;
+const DEFAULT_WEB_CLIENT_ID = "qNAx1RDb";
+const DEFAULT_WEB_CLIENT_SECRET = "K3YYSjCgDJNoWKdGVOyO1mrROp3MMZqqRNXNXTmh";
 
 export class PocketBookClient {
   constructor(private readonly config: PocketBookConfig) {}
@@ -62,7 +88,10 @@ export class PocketBookClient {
       baseUrl: this.config.baseUrl,
       hasAccessToken: Boolean(this.config.accessToken),
       hasRefreshToken: Boolean(this.config.refreshToken),
+      hasUsername: Boolean(this.config.username),
+      hasPassword: Boolean(this.config.password),
       hasWebClientId: Boolean(this.config.webClientId),
+      hasWebClientSecret: Boolean(this.config.webClientSecret),
       hasCookie: Boolean(this.config.cookieHeader),
       hasEnvFilePath: Boolean(this.config.envFilePath),
       configuredPaths: {
@@ -75,10 +104,6 @@ export class PocketBookClient {
 
   async get(path: string): Promise<PocketBookResponse> {
     return this.request("GET", path);
-  }
-
-  async postJson(path: string, body: unknown): Promise<PocketBookResponse> {
-    return this.request("POST", path, body);
   }
 
   async renewToken(refreshToken = this.config.refreshToken): Promise<TokenRefreshResult> {
@@ -98,6 +123,66 @@ export class PocketBookClient {
 
     const body = response.bodyPreview;
     const tokenBody = isRecord(body) ? body : {};
+
+    return {
+      ...response,
+      tokens: {
+        accessToken: stringValue(tokenBody.access_token),
+        refreshToken: stringValue(tokenBody.refresh_token),
+        expiresIn: numberValue(tokenBody.expires_in),
+        tokenType: stringValue(tokenBody.token_type),
+      },
+    };
+  }
+
+  async authProviders(username = this.config.username, language = this.config.language): Promise<AuthProvider[]> {
+    if (!username?.trim()) {
+      throw new Error("POCKETBOOK_LOGIN or POCKETBOOK_USERNAME is required to discover PocketBook auth providers.");
+    }
+
+    const params = new URLSearchParams({
+      username: username.trim(),
+      client_id: this.webClientId(),
+      client_secret: this.webClientSecret(),
+    });
+    if (language?.trim()) {
+      params.set("language", language.trim());
+    }
+
+    const response = await this.get(`/api/v1.0/auth/login?${params.toString()}`);
+    if (response.status < 200 || response.status >= 300) {
+      return [];
+    }
+
+    return parseAuthProviders(response.bodyPreview);
+  }
+
+  async login(input: LoginInput): Promise<LoginResult> {
+    const alias = input.provider.alias?.trim();
+    const shopId = input.provider.shopId?.trim();
+    if (!alias) {
+      throw new Error("Selected PocketBook auth provider does not include an alias.");
+    }
+    if (!shopId) {
+      throw new Error("Selected PocketBook auth provider does not include a shop_id.");
+    }
+
+    const body = new URLSearchParams({
+      shop_id: shopId,
+      username: input.username.trim(),
+      password: input.password,
+      client_id: this.webClientId(),
+      client_secret: this.webClientSecret(),
+      grant_type: "password",
+    });
+    if (input.language?.trim()) {
+      body.set("language", input.language.trim());
+    }
+
+    const response = await this.request("POST", `/api/v1.0/auth/login/${encodeURIComponent(alias)}`, body, {
+      contentType: "application/x-www-form-urlencoded",
+    });
+    const tokenBody = isRecord(response.bodyPreview) ? response.bodyPreview : {};
 
     return {
       ...response,
@@ -254,6 +339,14 @@ export class PocketBookClient {
       return path;
     }
   }
+
+  private webClientId(): string {
+    return this.config.webClientId ?? DEFAULT_WEB_CLIENT_ID;
+  }
+
+  private webClientSecret(): string {
+    return this.config.webClientSecret ?? DEFAULT_WEB_CLIENT_SECRET;
+  }
 }
 
 function serializeBody(body: unknown): BodyInit | undefined {
@@ -311,6 +404,49 @@ function stringValue(value: unknown): string | undefined {
 
 function numberValue(value: unknown): number | undefined {
   return typeof value === "number" ? value : undefined;
+}
+
+function parseAuthProviders(body: unknown): AuthProvider[] {
+  const rawProviders = providerList(body);
+  return rawProviders.map((provider) => ({
+    alias: stringValue(provider.alias),
+    shopId: idValue(provider.shop_id) ?? idValue(provider.shopId),
+    name: stringValue(provider.name),
+    id: stringValue(provider.id),
+    raw: provider,
+  }));
+}
+
+function providerList(body: unknown): Array<Record<string, unknown>> {
+  if (!isRecord(body)) {
+    return [];
+  }
+
+  const candidates = [
+    body.providers,
+    body["auth-providers"],
+    isRecord(body.data) ? body.data.providers : undefined,
+    isRecord(body.data) ? body.data["auth-providers"] : undefined,
+  ];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate.filter(isRecord);
+    }
+  }
+
+  return [];
+}
+
+function idValue(value: unknown): string | undefined {
+  if (typeof value === "string" && value.trim()) {
+    return value;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return undefined;
 }
 
 function guessContentType(filePath: string): string {

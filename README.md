@@ -33,6 +33,25 @@ POCKETBOOK_ENV_FILE=/absolute/path/to/.env
 
 The CLI reads the local `.env` first, then reads `POCKETBOOK_ENV_FILE` when it is set. This lets the skill reuse an existing PocketBook credential file without copying token values into this checkout.
 
+Alternatively, save login credentials in the env file and let the CLI fetch and persist tokens:
+
+```bash
+POCKETBOOK_LOGIN=reader@example.com
+POCKETBOOK_PASSWORD=...
+POCKETBOOK_WEB_CLIENT_ID=qNAx1RDb
+POCKETBOOK_WEB_CLIENT_SECRET=K3YYSjCgDJNoWKdGVOyO1mrROp3MMZqqRNXNXTmh
+```
+
+Then run:
+
+```bash
+npm run pocketbook -- login
+```
+
+`POCKETBOOK_USERNAME` can be used instead of `POCKETBOOK_LOGIN`. If PocketBook returns more than one bookstore provider for the login, set `POCKETBOOK_PROVIDER_ALIAS` and/or `POCKETBOOK_SHOP_ID`, or pass `--provider-alias` and `--shop-id`.
+
+After `login` succeeds, verify the persisted token pair with `user` and `refresh-token`.
+
 Optional:
 
 ```bash
@@ -74,7 +93,15 @@ npm run pocketbook -- refresh-token --no-persist
 
 If an authenticated command returns `Unknown token` or `error_code: 223`, the CLI retries once after a successful refresh.
 
-If refresh returns `Unknown token` or `Invalid refresh token`, get a fresh token pair from the browser:
+If refresh returns `Unknown token` or `Invalid refresh token`, first try the env login flow:
+
+```bash
+npm run pocketbook -- login
+npm run pocketbook -- user
+npm run pocketbook -- refresh-token
+```
+
+If login is unavailable or fails, get a fresh token pair from the browser:
 
 1. Open `https://cloud.pocketbook.digital` in a browser and sign in again.
 2. Open developer tools.
@@ -97,6 +124,7 @@ Some API responses include signed URLs with `access_token` query parameters. Tre
 
 - `config` - show non-secret configuration.
 - `status` - request `/`.
+- `login [--username LOGIN] [--password PASSWORD] [--provider-alias ALIAS] [--shop-id ID] [--language LANG] [--no-persist]` - log in with env or option credentials and persist returned tokens by default.
 - `refresh-token [--refresh-token TOKEN] [--no-persist]` - renew credentials and persist them by default.
 - `get --path /api/...` - authenticated GET for API discovery.
 - `user` - normalized `/api/v1.0/user`.
