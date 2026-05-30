@@ -148,7 +148,39 @@ describe("PocketBookClient", () => {
         headers: expect.objectContaining({
           "content-type": "application/x-www-form-urlencoded",
         }),
-        body: "shop_id=1&username=reader%40example.test&password=secret-password&client_id=client-id&client_secret=client-secret&grant_type=password&language=ru",
+        body: "shop_id=1&username=reader%40example.test&password=secret-password&client_id=client-id&grant_type=password&client_secret=client-secret&language=ru",
+      }),
+    );
+  });
+
+  it("uses the public web client secret fallback for login requests when not configured", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          providers: [{ alias: "pbook", shop_id: 1, name: "PocketBook" }],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          access_token: "login-access",
+          refresh_token: "login-refresh",
+        }),
+      );
+
+    const client = new PocketBookClient({
+      baseUrl: "https://cloud.pocketbook.digital",
+    });
+    const providers = await client.authProviders("reader@example.test");
+    await client.login({
+      username: "reader@example.test",
+      password: "secret-password",
+      provider: providers[0],
+    });
+
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("client_secret=");
+    expect(fetchMock.mock.calls[1]![1]).toEqual(
+      expect.objectContaining({
+        body: expect.stringContaining("client_secret="),
       }),
     );
   });
@@ -326,6 +358,29 @@ describe("PocketBookClient", () => {
     );
 
     await rm(dir, { recursive: true, force: true });
+  });
+
+  it("deletes books by fast_hash", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ deleted: true }));
+
+    const client = new PocketBookClient({
+      baseUrl: "https://cloud.pocketbook.digital",
+      accessToken: "token",
+    });
+
+    await expect(client.deleteBook("hash with spaces")).resolves.toMatchObject({
+      status: 200,
+      bodyPreview: { deleted: true },
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL("https://cloud.pocketbook.digital/api/v1.1/fileops/delete/?fast_hash=hash+with+spaces"),
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          authorization: "Bearer token",
+        }),
+      }),
+    );
   });
 
   it("URL-encodes custom remote upload names", async () => {

@@ -14,6 +14,7 @@ const COMMANDS = [
   "list-books",
   "books-info",
   "upload-file",
+  "delete-book",
   "upload-files",
   "probe-profile",
   "probe-books",
@@ -78,6 +79,10 @@ async function runCommand(
         filePath: requiredStringOption(options, "file"),
         remoteName: stringOption(options, "remote-name"),
         contentType: stringOption(options, "content-type"),
+      });
+    case "delete-book":
+      return actions.deleteBook({
+        fastHash: requiredStringOption(options, "fast-hash"),
       });
     case "upload-files":
       return actions.uploadFiles(parseUploadFiles(options));
@@ -199,6 +204,7 @@ Commands:
   list-books [--offset 0] [--limit 100]
   books-info
   upload-file --file /path/book.epub [--remote-name name.epub] [--content-type type]
+  delete-book --fast-hash HASH
   upload-files --files '[{"filePath":"/path/book.epub"}]'
   probe-profile
   probe-books

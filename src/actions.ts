@@ -67,11 +67,40 @@ export function createPocketBookActions(config: PocketBookConfig) {
     return true;
   };
 
+  const loginAuth = async (): Promise<boolean> => {
+    if (!config.username || !config.password) {
+      return false;
+    }
+
+    const providers = await client.authProviders(config.username, config.language);
+    const provider = selectAuthProvider(providers, {
+      providerAlias: config.providerAlias,
+      shopId: config.shopId,
+    });
+    const response = await client.login({
+      username: config.username,
+      password: config.password,
+      provider,
+      language: config.language,
+    });
+    const hasNewAccessToken = Boolean(response.tokens.accessToken);
+    if (!isOk(response.status) || !hasNewAccessToken) {
+      return false;
+    }
+
+    client.updateTokens(response.tokens);
+    await persistTokens(response.tokens);
+
+    return true;
+  };
+
+  const recoverAuth = async (): Promise<boolean> => (await refreshAuth()) || (await loginAuth());
+
   const withAuthRefresh = async <T extends { status: number; bodyPreview: unknown }>(
     action: () => Promise<T>,
   ): Promise<T> => {
     const response = await action();
-    if (!isUnknownToken(response) || !(await refreshAuth())) {
+    if (!isRecoverableAuthError(response) || !(await recoverAuth())) {
       return response;
     }
 
@@ -216,10 +245,18 @@ export function createPocketBookActions(config: PocketBookConfig) {
         upload: normalizeUploadPayload(response.bodyPreview, input.remoteName),
       };
     },
+    deleteBook: async (input: { fastHash: string }) => {
+      const response = await withAuthRefresh(() => client.deleteBook(input.fastHash));
+      return {
+        ok: isOk(response.status),
+        status: response.status,
+        deletion: normalizeUploadPayload(response.bodyPreview, undefined),
+      };
+    },
     uploadFiles: async (files: UploadFileInput[]) => {
       const initialResults = await client.uploadFiles(files);
-      const hasUnknownToken = initialResults.some((result) => result.response && isUnknownToken(result.response));
-      const results = hasUnknownToken && (await refreshAuth())
+      const hasAuthError = initialResults.some((result) => result.response && isRecoverableAuthError(result.response));
+      const results = hasAuthError && (await recoverAuth())
         ? mergeUploadResults(
             initialResults,
             await client.uploadFiles(files.filter((_, index) => !initialResults[index]?.ok)),
@@ -284,9 +321,9 @@ function isOk(status: number): boolean {
   return status >= 200 && status < 300;
 }
 
-function isUnknownToken(response: { status: number; bodyPreview: unknown }): boolean {
+function isRecoverableAuthError(response: { status: number; bodyPreview: unknown }): boolean {
   const body = response.bodyPreview;
-  return response.status === 403 && isRecord(body) && body.error_code === 223;
+  return response.status === 403 && isRecord(body) && (body.error_code === 222 || body.error_code === 223);
 }
 
 function mergeUploadResults(

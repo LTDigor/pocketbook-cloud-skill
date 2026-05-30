@@ -143,8 +143,11 @@ export class PocketBookClient {
     const params = new URLSearchParams({
       username: username.trim(),
       client_id: this.webClientId(),
-      client_secret: this.webClientSecret(),
     });
+    const clientSecret = this.webClientSecret();
+    if (clientSecret) {
+      params.set("client_secret", clientSecret);
+    }
     if (language?.trim()) {
       params.set("language", language.trim());
     }
@@ -172,9 +175,12 @@ export class PocketBookClient {
       username: input.username.trim(),
       password: input.password,
       client_id: this.webClientId(),
-      client_secret: this.webClientSecret(),
       grant_type: "password",
     });
+    const clientSecret = this.webClientSecret();
+    if (clientSecret) {
+      body.set("client_secret", clientSecret);
+    }
     if (input.language?.trim()) {
       body.set("language", input.language.trim());
     }
@@ -213,6 +219,16 @@ export class PocketBookClient {
     return this.request("PUT", `/api/v1.1/files/${safeName}`, bytes, {
       contentType: contentType || guessContentType(filePath),
     });
+  }
+
+  async deleteBook(fastHash: string): Promise<PocketBookResponse> {
+    const trimmedFastHash = fastHash.trim();
+    if (!trimmedFastHash) {
+      throw new Error("A non-empty PocketBook fast_hash is required to delete a book.");
+    }
+
+    const params = new URLSearchParams({ fast_hash: trimmedFastHash });
+    return this.request("POST", `/api/v1.1/fileops/delete/?${params.toString()}`);
   }
 
   async uploadFiles(files: UploadFileInput[]): Promise<BatchUploadResult[]> {
@@ -344,7 +360,7 @@ export class PocketBookClient {
     return this.config.webClientId ?? DEFAULT_WEB_CLIENT_ID;
   }
 
-  private webClientSecret(): string {
+  private webClientSecret(): string | undefined {
     return this.config.webClientSecret ?? DEFAULT_WEB_CLIENT_SECRET;
   }
 }

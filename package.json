@@ -4,8 +4,15 @@
   "description": "Codex skill support scripts for PocketBook Cloud workflows.",
   "type": "module",
   "bin": {
-    "pocketbook-cloud": "./dist/cli.js"
+    "pocketbook-cloud": "dist/cli.js"
   },
+  "files": [
+    "SKILL.md",
+    "agents/",
+    "bin/",
+    "dist/",
+    ".env.example"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/LTDigor/pocketbook-cloud-skill.git"
@@ -16,6 +23,7 @@
   "homepage": "https://github.com/LTDigor/pocketbook-cloud-skill#readme",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "prepack": "npm run build",
     "pocketbook": "tsx src/cli.ts",
     "start": "node dist/cli.js",
     "test": "vitest run",

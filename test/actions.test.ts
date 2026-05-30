@@ -114,6 +114,31 @@ describe("createPocketBookActions", () => {
     await rm(dir, { recursive: true, force: true });
   });
 
+  it("deletes a book by fast_hash", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ deleted: true }));
+    const actions = createPocketBookActions({
+      baseUrl: "https://cloud.pocketbook.digital",
+      accessToken: "token",
+    });
+
+    await expect(actions.deleteBook({ fastHash: "fast-hash-1" })).resolves.toMatchObject({
+      ok: true,
+      status: 200,
+      deletion: {
+        deleted: true,
+      },
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL("https://cloud.pocketbook.digital/api/v1.1/fileops/delete/?fast_hash=fast-hash-1"),
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          authorization: "Bearer token",
+        }),
+      }),
+    );
+  });
+
   it("retries only failed uploads after refreshing auth", async () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ uploaded: "one" }))
@@ -403,6 +428,85 @@ describe("createPocketBookActions", () => {
     );
     await expect(import("node:fs/promises").then(({ readFile }) => readFile(envFilePath, "utf8"))).resolves.toContain(
       "POCKETBOOK_ACCESS_TOKEN=new-access",
+    );
+
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("logs in and retries when refresh cannot recover a bad access token", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            error_code: 222,
+            error_msg: "Wrong token format",
+          },
+          403,
+        ),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            error_msg: "Invalid refresh token",
+          },
+          403,
+        ),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          providers: [{ alias: "pbook", shop_id: 1, name: "PocketBook" }],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          access_token: "login-access",
+          refresh_token: "login-refresh",
+          token_type: "Bearer",
+          expires_in: 7200,
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ user_id: 4070456, email: "reader@example.test" }));
+    const dir = await mkdtemp(join(tmpdir(), "pocketbook-action-login-recover-"));
+    const envFilePath = join(dir, ".env");
+    await writeFile(
+      envFilePath,
+      [
+        "POCKETBOOK_BASE_URL=https://cloud.pocketbook.digital",
+        "POCKETBOOK_ACCESS_TOKEN=bad-access",
+        "POCKETBOOK_REFRESH_TOKEN=bad-refresh",
+        "",
+      ].join("\n"),
+    );
+    const actions = createPocketBookActions({
+      baseUrl: "https://cloud.pocketbook.digital",
+      accessToken: "bad-access",
+      refreshToken: "bad-refresh",
+      username: "reader@example.test",
+      password: "secret-password",
+      webClientId: "client-id",
+      webClientSecret: "client-secret",
+      envFilePath,
+    });
+
+    await expect(actions.user()).resolves.toMatchObject({
+      ok: true,
+      status: 200,
+      user: {
+        id: 4070456,
+        email: "reader@example.test",
+      },
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
+      new URL("https://cloud.pocketbook.digital/api/v1.0/user"),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          authorization: "Bearer login-access",
+        }),
+      }),
+    );
+    await expect(import("node:fs/promises").then(({ readFile }) => readFile(envFilePath, "utf8"))).resolves.toContain(
+      "POCKETBOOK_ACCESS_TOKEN=login-access",
     );
 
     await rm(dir, { recursive: true, force: true });

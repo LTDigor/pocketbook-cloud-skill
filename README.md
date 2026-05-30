@@ -22,24 +22,11 @@ cp .env.example .env
 
 ## Authentication
 
-Use values copied from an authenticated PocketBook Cloud session:
-
-```bash
-POCKETBOOK_ACCESS_TOKEN=...
-POCKETBOOK_REFRESH_TOKEN=...
-POCKETBOOK_WEB_CLIENT_ID=...
-POCKETBOOK_ENV_FILE=/absolute/path/to/.env
-```
-
-The CLI reads the local `.env` first, then reads `POCKETBOOK_ENV_FILE` when it is set. This lets the skill reuse an existing PocketBook credential file without copying token values into this checkout.
-
-Alternatively, save login credentials in the env file and let the CLI fetch and persist tokens:
+For a fresh setup, provide only the PocketBook login and password:
 
 ```bash
 POCKETBOOK_LOGIN=reader@example.com
 POCKETBOOK_PASSWORD=...
-POCKETBOOK_WEB_CLIENT_ID=qNAx1RDb
-POCKETBOOK_WEB_CLIENT_SECRET=K3YYSjCgDJNoWKdGVOyO1mrROp3MMZqqRNXNXTmh
 ```
 
 Then run:
@@ -48,9 +35,21 @@ Then run:
 npm run pocketbook -- login
 ```
 
-`POCKETBOOK_USERNAME` can be used instead of `POCKETBOOK_LOGIN`. If PocketBook returns more than one bookstore provider for the login, set `POCKETBOOK_PROVIDER_ALIAS` and/or `POCKETBOOK_SHOP_ID`, or pass `--provider-alias` and `--shop-id`.
+`login` fetches and persists `POCKETBOOK_ACCESS_TOKEN` and `POCKETBOOK_REFRESH_TOKEN` automatically. The CLI reads the local `.env` first, then reads `POCKETBOOK_ENV_FILE` when it is set. This lets the skill reuse an existing credential file without copying token values into this checkout.
+
+Token-only configuration also works when password login is unavailable:
+
+```bash
+POCKETBOOK_ACCESS_TOKEN=...
+POCKETBOOK_REFRESH_TOKEN=...
+POCKETBOOK_ENV_FILE=/absolute/path/to/.env
+```
+
+`POCKETBOOK_USERNAME` can be used instead of `POCKETBOOK_LOGIN`. The CLI uses the public web app client id and public web client secret by default. Override `POCKETBOOK_WEB_CLIENT_SECRET` only if the web app changes. If PocketBook returns more than one bookstore provider for the login, set `POCKETBOOK_PROVIDER_ALIAS` and/or `POCKETBOOK_SHOP_ID`, or pass `--provider-alias` and `--shop-id`.
 
 After `login` succeeds, verify the persisted token pair with `user` and `refresh-token`.
+
+Do not commit login/password values. Keep them only in local environment variables or ignored `.env` files.
 
 Optional:
 
@@ -91,7 +90,7 @@ By default, the command persists renewed credentials to `POCKETBOOK_ENV_FILE` wh
 npm run pocketbook -- refresh-token --no-persist
 ```
 
-If an authenticated command returns `Unknown token` or `error_code: 223`, the CLI retries once after a successful refresh.
+If an authenticated command returns `Wrong token format`, `Unknown token`, `error_code: 222`, or `error_code: 223`, the CLI retries once after a successful token refresh or password login recovery.
 
 If refresh returns `Unknown token` or `Invalid refresh token`, first try the env login flow:
 
@@ -107,8 +106,7 @@ If login is unavailable or fails, get a fresh token pair from the browser:
 2. Open developer tools.
 3. In the Application or Storage panel, inspect Local Storage for the `https://cloud.pocketbook.digital` origin, or inspect an authenticated API request in the Network panel.
 4. Copy the fresh `access_token` and `refresh_token` values into `.env`.
-5. Keep `POCKETBOOK_WEB_CLIENT_ID=qNAx1RDb`.
-6. Verify the recovered credentials:
+5. Verify the recovered credentials:
 
 ```bash
 npm run pocketbook -- config
@@ -131,6 +129,7 @@ Some API responses include signed URLs with `access_token` query parameters. Tre
 - `list-books [--offset N] [--limit N]` - normalized `/api/v1.0/books`.
 - `books-info` - `/api/v1.0/stats/books-info`.
 - `upload-file --file /absolute/path [--remote-name NAME] [--content-type TYPE]`.
+- `delete-book --fast-hash HASH` - delete a book by the PocketBook `fast_hash` value returned in book listings.
 - `upload-files --files '[{"filePath":"/absolute/path/book.epub"}]'`.
 - `probe-profile`, `probe-books`, `probe-devices` - try likely endpoints.
 
@@ -150,4 +149,10 @@ Live integration tests are skipped by default:
 
 ```bash
 POCKETBOOK_RUN_INTEGRATION=1 npm test
+```
+
+Mutation integration tests that upload and delete a temporary test book require an extra flag:
+
+```bash
+POCKETBOOK_RUN_INTEGRATION=1 POCKETBOOK_RUN_MUTATION_INTEGRATION=1 npm test
 ```

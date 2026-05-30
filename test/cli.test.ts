@@ -212,6 +212,27 @@ describe("PocketBook skill CLI", () => {
     );
   });
 
+  it("deletes a book by fast_hash through the documented command", async () => {
+    await expect(runCli(["delete-book", "--fast-hash", "fast-hash-1"])).resolves.toMatchObject({
+      ok: true,
+      status: 200,
+      deletion: {
+        deleted: true,
+        fast_hash: "fast-hash-1",
+      },
+    });
+
+    expect(requests).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          method: "POST",
+          url: "/api/v1.1/fileops/delete/?fast_hash=fast-hash-1",
+          authorization: "Bearer external-access",
+        }),
+      ]),
+    );
+  });
+
   it("refreshes tokens and persists them to POCKETBOOK_ENV_FILE", async () => {
     await expect(runCli(["refresh-token"])).resolves.toMatchObject({
       ok: true,
@@ -274,7 +295,7 @@ describe("PocketBook skill CLI", () => {
         expect.objectContaining({
           method: "POST",
           url: "/api/v1.0/auth/login/pbook",
-          body: "shop_id=1&username=reader%40example.test&password=secret-password&client_id=web-client-123&client_secret=web-secret-123&grant_type=password&language=ru",
+          body: "shop_id=1&username=reader%40example.test&password=secret-password&client_id=web-client-123&grant_type=password&client_secret=web-secret-123&language=ru",
         }),
       ]),
     );
@@ -433,6 +454,14 @@ async function handleRequest(
       uploaded: true,
       path: url.pathname,
       bytes: body.length,
+    });
+    return;
+  }
+
+  if (recorded.method === "POST" && url.pathname === "/api/v1.1/fileops/delete/") {
+    writeJson(response, {
+      deleted: true,
+      fast_hash: url.searchParams.get("fast_hash"),
     });
     return;
   }
