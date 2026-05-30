@@ -249,8 +249,8 @@ describe("PocketBook skill CLI", () => {
       },
     });
 
-    await expect(readFile(envFilePath, "utf8")).resolves.toContain("POCKETBOOK_ACCESS_TOKEN=new-access-token");
-    await expect(readFile(envFilePath, "utf8")).resolves.toContain("POCKETBOOK_REFRESH_TOKEN=new-refresh-token");
+    await expect(readFile(envFilePath, "utf8")).resolves.toContain('POCKETBOOK_ACCESS_TOKEN="new-access-token"');
+    await expect(readFile(envFilePath, "utf8")).resolves.toContain('POCKETBOOK_REFRESH_TOKEN="new-refresh-token"');
     expect(requests).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -284,8 +284,8 @@ describe("PocketBook skill CLI", () => {
     });
 
     const envText = await readFile(envFilePath, "utf8");
-    expect(envText).toContain("POCKETBOOK_ACCESS_TOKEN=login-access-token");
-    expect(envText).toContain("POCKETBOOK_REFRESH_TOKEN=login-refresh-token");
+    expect(envText).toContain('POCKETBOOK_ACCESS_TOKEN="login-access-token"');
+    expect(envText).toContain('POCKETBOOK_REFRESH_TOKEN="login-refresh-token"');
     expect(requests).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

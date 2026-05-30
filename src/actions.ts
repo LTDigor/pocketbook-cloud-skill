@@ -359,7 +359,7 @@ async function updateEnvFile(filePath: string, values: Record<string, string | u
       continue;
     }
 
-    const line = `${key}=${value}`;
+    const line = `${key}=${formatEnvValue(value)}`;
     const pattern = new RegExp(`^${escapeRegExp(key)}=.*$`, "m");
     text = pattern.test(text) ? text.replace(pattern, line) : `${text.replace(/\s*$/, "")}\n${line}\n`;
   }
@@ -373,6 +373,10 @@ function isMissingFile(error: unknown): boolean {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function formatEnvValue(value: string): string {
+  return JSON.stringify(value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

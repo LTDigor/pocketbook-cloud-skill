@@ -9,7 +9,7 @@ Use this skill when the user asks Codex to work with PocketBook Cloud. Do not us
 
 ## Quick Start
 
-Run commands from this skill directory:
+Run commands from the plugin or repository root (the directory containing `package.json`):
 
 ```bash
 npm install

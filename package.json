@@ -8,9 +8,12 @@
   },
   "files": [
     "SKILL.md",
+    "skills/",
     "agents/",
     "bin/",
+    "scripts/",
     "dist/",
+    ".codex-plugin/",
     ".env.example"
   ],
   "repository": {

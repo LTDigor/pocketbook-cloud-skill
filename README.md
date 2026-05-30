@@ -18,6 +18,43 @@ npm run build
 cp .env.example .env
 ```
 
+## Install
+
+One-command global install for Codex:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/LTDigor/pocketbook-cloud-skill/main/scripts/install.sh | sh
+```
+
+The installer downloads this repository into `${CODEX_HOME:-~/.codex}/skills/pocketbook-cloud`, installs npm dependencies, builds the CLI, and preserves an existing local `.env` file during reinstall. Restart Codex after installing.
+
+To pin a branch, tag, or fork:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/LTDigor/pocketbook-cloud-skill/main/scripts/install.sh | \
+  POCKETBOOK_CLOUD_SKILL_REF=v0.1.0 \
+  POCKETBOOK_CLOUD_SKILL_REPO=LTDigor/pocketbook-cloud-skill \
+  sh
+```
+
+Codex Plugin Marketplace compatible installs are also supported after the repository is public:
+
+```bash
+npx codex-marketplace add LTDigor/pocketbook-cloud-skill --plugin --global
+```
+
+Use the plugin install path for marketplace users because it installs the skill instructions together with the bundled npm CLI.
+
+## Publishing
+
+The repository is prepared for three public distribution channels:
+
+1. GitHub standalone skill: users can install with the `curl` command above or with Codex `$skill-installer` from the GitHub tree URL.
+2. Codex Plugin Marketplace: submit the public GitHub repository URL. The required `.codex-plugin/plugin.json` and `skills/pocketbook-cloud/SKILL.md` files are included.
+3. npm: publish the CLI package with `npm publish`; this distributes the `pocketbook-cloud` binary, but users still need a Codex skill/plugin install for Codex discovery.
+
+Before publishing, make sure `.env`, cookies, downloaded books, and command output containing signed URLs are not committed.
+
 `.fb2.zip` files can be uploaded as-is if the task does not require inspecting the archive contents.
 
 ## Authentication

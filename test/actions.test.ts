@@ -246,10 +246,48 @@ describe("createPocketBookActions", () => {
       },
     });
     await expect(import("node:fs/promises").then(({ readFile }) => readFile(envFilePath, "utf8"))).resolves.toContain(
-      "POCKETBOOK_ACCESS_TOKEN=new-access",
+      'POCKETBOOK_ACCESS_TOKEN="new-access"',
     );
     await expect(import("node:fs/promises").then(({ readFile }) => readFile(envFilePath, "utf8"))).resolves.toContain(
-      "POCKETBOOK_REFRESH_TOKEN=new-refresh",
+      'POCKETBOOK_REFRESH_TOKEN="new-refresh"',
+    );
+
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("quotes persisted token values so dotenv parses special characters", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        access_token: "new#access with space",
+        refresh_token: "new=refresh#value",
+      }),
+    );
+    const dir = await mkdtemp(join(tmpdir(), "pocketbook-action-refresh-quoted-"));
+    const envFilePath = join(dir, ".env");
+    await writeFile(
+      envFilePath,
+      [
+        "POCKETBOOK_ACCESS_TOKEN=old-access",
+        "POCKETBOOK_REFRESH_TOKEN=old-refresh",
+        "",
+      ].join("\n"),
+    );
+    const actions = createPocketBookActions({
+      baseUrl: "https://cloud.pocketbook.digital",
+      accessToken: "old-access",
+      refreshToken: "old-refresh",
+      envFilePath,
+    });
+
+    await expect(actions.refreshToken()).resolves.toMatchObject({
+      ok: true,
+      persisted: true,
+    });
+    await expect(import("node:fs/promises").then(({ readFile }) => readFile(envFilePath, "utf8"))).resolves.toContain(
+      'POCKETBOOK_ACCESS_TOKEN="new#access with space"',
+    );
+    await expect(import("node:fs/promises").then(({ readFile }) => readFile(envFilePath, "utf8"))).resolves.toContain(
+      'POCKETBOOK_REFRESH_TOKEN="new=refresh#value"',
     );
 
     await rm(dir, { recursive: true, force: true });
@@ -301,10 +339,10 @@ describe("createPocketBookActions", () => {
       },
     });
     await expect(import("node:fs/promises").then(({ readFile }) => readFile(envFilePath, "utf8"))).resolves.toContain(
-      "POCKETBOOK_ACCESS_TOKEN=login-access",
+      'POCKETBOOK_ACCESS_TOKEN="login-access"',
     );
     await expect(import("node:fs/promises").then(({ readFile }) => readFile(envFilePath, "utf8"))).resolves.toContain(
-      "POCKETBOOK_REFRESH_TOKEN=login-refresh",
+      'POCKETBOOK_REFRESH_TOKEN="login-refresh"',
     );
 
     await rm(dir, { recursive: true, force: true });
@@ -427,7 +465,7 @@ describe("createPocketBookActions", () => {
       }),
     );
     await expect(import("node:fs/promises").then(({ readFile }) => readFile(envFilePath, "utf8"))).resolves.toContain(
-      "POCKETBOOK_ACCESS_TOKEN=new-access",
+      'POCKETBOOK_ACCESS_TOKEN="new-access"',
     );
 
     await rm(dir, { recursive: true, force: true });
@@ -506,7 +544,7 @@ describe("createPocketBookActions", () => {
       }),
     );
     await expect(import("node:fs/promises").then(({ readFile }) => readFile(envFilePath, "utf8"))).resolves.toContain(
-      "POCKETBOOK_ACCESS_TOKEN=login-access",
+      'POCKETBOOK_ACCESS_TOKEN="login-access"',
     );
 
     await rm(dir, { recursive: true, force: true });
