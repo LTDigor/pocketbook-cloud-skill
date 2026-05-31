@@ -45,6 +45,35 @@ npx codex-marketplace add LTDigor/pocketbook-cloud-skill --plugin --global
 
 Use the plugin install path for marketplace users because it installs the skill instructions together with the bundled npm CLI.
 
+## Update
+
+Update a standalone Codex skill install to the latest `main`:
+
+```bash
+${CODEX_HOME:-$HOME/.codex}/skills/pocketbook-cloud/scripts/update.sh
+```
+
+The updater fetches the installer for the selected repository and ref, then reinstalls the skill in place. The existing local `.env` file is preserved, dependencies are reinstalled, and the CLI is rebuilt.
+
+You can also update directly from GitHub:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/LTDigor/pocketbook-cloud-skill/main/scripts/update.sh | sh
+```
+
+To update to a specific branch, tag, or fork:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/LTDigor/pocketbook-cloud-skill/main/scripts/update.sh | \
+  POCKETBOOK_CLOUD_SKILL_REF=v0.1.0 \
+  POCKETBOOK_CLOUD_SKILL_REPO=LTDigor/pocketbook-cloud-skill \
+  sh
+```
+
+Restart Codex after updating so the refreshed skill instructions are loaded.
+
+Marketplace/plugin users should update through the Codex Plugin Marketplace update flow instead of running the standalone skill updater.
+
 ## Publishing
 
 The repository is prepared for three public distribution channels:

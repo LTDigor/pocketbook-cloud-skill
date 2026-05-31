@@ -19,6 +19,18 @@ npm run pocketbook -- list-books --limit 100
 
 The CLI prints JSON and reads credentials from environment variables or `.env` through `dotenv`.
 
+## Updating the skill
+
+For standalone installs, update the skill with the bundled updater:
+
+```bash
+./scripts/update.sh
+```
+
+The updater reinstalls the selected repository/ref in place, preserves the local `.env`, reinstalls npm dependencies, and rebuilds the CLI. Set `POCKETBOOK_CLOUD_SKILL_REF`, `POCKETBOOK_CLOUD_SKILL_REPO`, or `POCKETBOOK_CLOUD_SKILL_INSTALL_DIR` before running it to update from a specific tag, fork, or install directory.
+
+Restart Codex after updating so refreshed skill instructions are loaded. For Codex Plugin Marketplace installs, use the marketplace update flow instead of this standalone updater.
+
 ## Configuration
 
 User-provided login variables:
