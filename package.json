@@ -7,11 +7,9 @@
     "pocketbook-cloud": "dist/cli.js"
   },
   "files": [
-    "SKILL.md",
     "skills/",
     "agents/",
     "bin/",
-    "scripts/",
     "dist/",
     ".codex-plugin/",
     ".env.example"
