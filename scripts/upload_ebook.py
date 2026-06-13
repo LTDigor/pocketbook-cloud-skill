@@ -5,7 +5,8 @@ import argparse
 import subprocess
 from pathlib import Path
 
-from pocketbook_common import PocketBookClient, guess_content_type, load_config, print_json, run_or_exit, upload_summary
+from pocketbook_common import PocketBookClient, guess_content_type, print_json, run_or_exit, upload_summary
+from pocketbook_config import load_config, persist_tokens
 
 
 def main() -> int:
@@ -24,7 +25,7 @@ def main() -> int:
         list_zip_entries(file_path) if file_path.suffix.lower() == ".zip" else [],
     )
 
-    client = PocketBookClient(load_config(args.env_file))
+    client = PocketBookClient(load_config(args.env_file), persist_tokens)
     response = client.upload_file(file_path, remote_name, guess_content_type(remote_name))
     summary = upload_summary(response, remote_name)
     print_json(summary)

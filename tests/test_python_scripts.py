@@ -14,6 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 AUTH_SCRIPT = REPO_ROOT / "scripts" / "pocketbook_auth.py"
 UPLOAD_SCRIPT = REPO_ROOT / "scripts" / "upload_ebook.py"
 DELETE_SCRIPT = REPO_ROOT / "scripts" / "delete_ebook.py"
+GET_BOOKS_SCRIPT = REPO_ROOT / "scripts" / "get_books.py"
 
 
 class PocketBookFakeHandler(BaseHTTPRequestHandler):
@@ -34,6 +35,47 @@ class PocketBookFakeHandler(BaseHTTPRequestHandler):
                 self.send_json({"error_code": 222, "error": "Unknown token"}, status=403)
                 return
             self.send_json({"user_id": 7, "email": "reader@example.test"})
+            return
+        if parsed.path == "/api/v1.1/files/":
+            if self.headers.get("authorization") != "Bearer access-login":
+                self.send_json({"error": "Forbidden"}, status=403)
+                return
+            self.send_json({"error": "old files API is gone"}, status=404)
+            return
+        if parsed.path == "/api/v1.0/books":
+            if self.headers.get("authorization") != "Bearer access-login":
+                self.send_json({"error": "Forbidden"}, status=403)
+                return
+            self.send_json(
+                {
+                    "books": [
+                        {
+                            "id": "done",
+                            "name": "Finished Book.fb2",
+                            "title": "Finished Book",
+                            "authors": ["Done Writer"],
+                            "fast_hash": "hash-done",
+                            "read_percent": 100,
+                            "signed_url": "https://example.test/download?access_token=secret",
+                        },
+                        {
+                            "id": "active",
+                            "name": "Deep Work.epub",
+                            "title": "Deep Work",
+                            "author": "Cal Newport",
+                            "fast_hash": "hash-active",
+                            "progress": 42,
+                        },
+                        {
+                            "id": "new",
+                            "name": "Clean Code.pdf",
+                            "title": "Clean Code",
+                            "authors": ["Robert C. Martin"],
+                            "fast_hash": "hash-new",
+                        },
+                    ]
+                }
+            )
             return
         self.send_json({"error": "not found"}, status=404)
 
@@ -188,6 +230,46 @@ class PythonScriptTests(unittest.TestCase):
         self.assertEqual(payload["fastHash"], "hash-123")
         delete_request = [request for request in PocketBookFakeHandler.requests if request["method"] == "POST"][-1]
         self.assertEqual(delete_request["path"], "/api/v1.1/fileops/delete/?fast_hash=hash-123")
+
+    def test_get_books_outputs_all_books(self):
+        self.run_script(AUTH_SCRIPT, ["login", "--env-file", str(self.env_file)])
+        result = self.run_script(GET_BOOKS_SCRIPT, ["--env-file", str(self.env_file)])
+
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["mode"], "books")
+        self.assertEqual(payload["count"], 3)
+        self.assertEqual(payload["finishedCount"], 1)
+        self.assertEqual([book["title"] for book in payload["books"]], ["Finished Book", "Deep Work", "Clean Code"])
+        self.assertEqual(payload["books"][0]["status"], "finished")
+        self.assertEqual(payload["books"][1]["progressPercent"], 42)
+        self.assertEqual(payload["books"][1]["status"], "in_progress")
+        self.assertEqual(payload["books"][2]["status"], "unread")
+        self.assertNotIn("access_token", result.stdout)
+        library_request = [request for request in PocketBookFakeHandler.requests if request["path"] == "/api/v1.0/books?limit=500"][0]
+        self.assertEqual(library_request["authorization"], "Bearer access-login")
+
+    def test_get_books_recovers_from_plain_403_with_login(self):
+        result = self.run_script(GET_BOOKS_SCRIPT, ["--env-file", str(self.env_file)])
+
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["count"], 3)
+        book_requests = [request for request in PocketBookFakeHandler.requests if request["path"] == "/api/v1.0/books?limit=500"]
+        self.assertEqual([request["authorization"] for request in book_requests], [None, "Bearer access-login"])
+        self.assertIn('POCKETBOOK_ACCESS_TOKEN="access-login"', self.env_file.read_text())
+
+    def test_get_books_falls_back_from_old_files_api(self):
+        self.run_script(AUTH_SCRIPT, ["login", "--env-file", str(self.env_file)])
+        result = self.run_script(GET_BOOKS_SCRIPT, ["--env-file", str(self.env_file), "--library-path", "/api/v1.1/files/"])
+
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["count"], 3)
+        self.assertEqual([request["path"] for request in PocketBookFakeHandler.requests if request["method"] == "GET"][-2:], [
+            "/api/v1.1/files/",
+            "/api/v1.0/books?limit=500",
+        ])
 
     def run_script(self, script, args):
         env = {**os.environ, "POCKETBOOK_SKIP_LOCAL_ENV": "1"}

@@ -1,7 +1,7 @@
 {
   "name": "pocketbook-cloud",
   "version": "0.1.0",
-  "description": "Work with PocketBook Cloud from Codex using bundled Python scripts.",
+  "description": "Work with PocketBook Cloud books, recommendations, auth, uploads, and deletes from Codex using bundled Python scripts.",
   "author": {
     "name": "LTDigor",
     "url": "https://github.com/LTDigor"
@@ -18,8 +18,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "PocketBook Cloud",
-    "shortDescription": "Authenticate, upload, and delete PocketBook Cloud books from Codex.",
-    "longDescription": "PocketBook Cloud gives Codex Python-script workflows for account checks, token refresh, uploads, and deletes without browser automation.",
+    "shortDescription": "List, recommend, upload, and delete PocketBook Cloud books from Codex.",
+    "longDescription": "PocketBook Cloud gives Codex Python-script workflows for library listing, reading recommendations, account checks, token refresh, uploads, and deletes without browser automation.",
     "developerName": "LTDigor",
     "category": "Productivity",
     "capabilities": [
@@ -28,6 +28,8 @@
     ],
     "websiteURL": "https://github.com/LTDigor/pocketbook-cloud-skill",
     "defaultPrompt": [
+      "Recommend three new books that are not already uploaded to my PocketBook Cloud library",
+      "List my PocketBook Cloud books",
       "Check my PocketBook Cloud auth",
       "Upload this ebook to PocketBook Cloud",
       "Delete this PocketBook Cloud test book"

@@ -4,7 +4,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from pocketbook_common import PocketBookClient, auth_result, load_config, persist_tokens, print_json, run_or_exit
+from pocketbook_common import PocketBookClient, auth_result, print_json, run_or_exit
+from pocketbook_config import load_config, persist_tokens
 
 
 def main() -> int:
@@ -15,7 +16,7 @@ def main() -> int:
     args = parser.parse_args()
 
     config = load_config(args.env_file)
-    client = PocketBookClient(config)
+    client = PocketBookClient(config, persist_tokens)
 
     if args.command == "config":
         print_json(client.config_summary())

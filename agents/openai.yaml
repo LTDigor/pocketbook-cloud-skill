@@ -1,4 +1,4 @@
 interface:
   display_name: "PocketBook Cloud"
-  short_description: "Manage PocketBook Cloud books and tokens"
-  default_prompt: "Use $pocketbook-cloud to list my PocketBook Cloud books."
+  short_description: "List uploaded books and recommend new books to read"
+  default_prompt: "Use $pocketbook-cloud to recommend three new books that are not already uploaded to my PocketBook Cloud library."

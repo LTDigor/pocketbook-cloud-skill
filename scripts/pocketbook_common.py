@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 import subprocess
 import sys
@@ -14,36 +13,13 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
 
+from pocketbook_config import Config
 
-DEFAULT_BASE_URL = "https://cloud.pocketbook.digital"
-DEFAULT_WEB_CLIENT_ID = "qNAx1RDb"
-DEFAULT_WEB_CLIENT_SECRET = "K3YYSjCgDJNoWKdGVOyO1mrROp3MMZqqRNXNXTmh"
+
 REDACTED = "[redacted]"
 SENSITIVE_KEY_RE = re.compile(r"(^|_|-)(access[_-]?token|refresh[_-]?token|token|password|authorization|cookie|secret)($|_|-)", re.I)
-
-
-@dataclass
-class Config:
-    base_url: str
-    access_token: str | None = None
-    refresh_token: str | None = None
-    username: str | None = None
-    password: str | None = None
-    provider_alias: str | None = None
-    shop_id: str | None = None
-    language: str | None = None
-    web_client_id: str | None = None
-    web_client_secret: str | None = None
-    cookie_header: str | None = None
-    env_file: Path | None = None
-
-    @property
-    def client_id(self) -> str:
-        return self.web_client_id or DEFAULT_WEB_CLIENT_ID
-
-    @property
-    def client_secret(self) -> str:
-        return self.web_client_secret or DEFAULT_WEB_CLIENT_SECRET
+DEFAULT_BOOKS_PATH = "/api/v1.0/books?limit=500"
+LEGACY_FILES_PATH = "/api/v1.1/files/"
 
 
 @dataclass
@@ -60,8 +36,9 @@ class PocketBookError(RuntimeError):
 
 
 class PocketBookClient:
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, token_persister=None):
         self.config = config
+        self.token_persister = token_persister
 
     def config_summary(self) -> dict[str, Any]:
         return {
@@ -247,14 +224,18 @@ class PocketBookClient:
         if self.config.refresh_token:
             response = self.refresh_token()
             if is_ok(response.status) and self.config.access_token:
-                persist_tokens(self.config)
+                self.persist_recovered_tokens()
                 return True
         if self.config.username and self.config.password:
             response = self.login()
             if is_ok(response.status) and self.config.access_token:
-                persist_tokens(self.config)
+                self.persist_recovered_tokens()
                 return True
         return False
+
+    def persist_recovered_tokens(self) -> None:
+        if self.token_persister:
+            self.token_persister(self.config)
 
     def authenticated(self, operation):
         response = operation()
@@ -278,103 +259,12 @@ class PocketBookClient:
         params = urlencode({"fast_hash": fast_hash.strip()})
         return self.authenticated(lambda: self.request("POST", f"/api/v1.1/fileops/delete/?{params}"))
 
-
-def load_config(env_file: Path | None = None) -> Config:
-    values: dict[str, str] = {}
-    local_env = Path(".env")
-    if not os.environ.get("POCKETBOOK_SKIP_LOCAL_ENV") and local_env.exists():
-        values.update(read_env_file(local_env))
-    values.update({key: value for key, value in os.environ.items() if key.startswith("POCKETBOOK_")})
-    selected_env_file = env_file or (Path(values["POCKETBOOK_ENV_FILE"]) if values.get("POCKETBOOK_ENV_FILE") else None)
-    if selected_env_file:
-        selected_env_file = selected_env_file.expanduser().resolve()
-        if selected_env_file.exists():
-            values.update(read_env_file(selected_env_file))
-        values["POCKETBOOK_ENV_FILE"] = str(selected_env_file)
-
-    cookie_header = empty_to_none(values.get("POCKETBOOK_COOKIE_HEADER"))
-    cookie_file = empty_to_none(values.get("POCKETBOOK_COOKIE_FILE"))
-    if not cookie_header and cookie_file:
-        cookie_header = read_cookie_file(Path(cookie_file))
-
-    return Config(
-        base_url=normalize_base_url(values.get("POCKETBOOK_BASE_URL") or DEFAULT_BASE_URL),
-        access_token=empty_to_none(values.get("POCKETBOOK_ACCESS_TOKEN")),
-        refresh_token=empty_to_none(values.get("POCKETBOOK_REFRESH_TOKEN")),
-        username=empty_to_none(values.get("POCKETBOOK_USERNAME")) or empty_to_none(values.get("POCKETBOOK_LOGIN")),
-        password=empty_to_none(values.get("POCKETBOOK_PASSWORD")),
-        provider_alias=empty_to_none(values.get("POCKETBOOK_PROVIDER_ALIAS")),
-        shop_id=empty_to_none(values.get("POCKETBOOK_SHOP_ID")),
-        language=empty_to_none(values.get("POCKETBOOK_LANGUAGE")),
-        web_client_id=empty_to_none(values.get("POCKETBOOK_WEB_CLIENT_ID")),
-        web_client_secret=empty_to_none(values.get("POCKETBOOK_WEB_CLIENT_SECRET")),
-        cookie_header=cookie_header,
-        env_file=Path(values["POCKETBOOK_ENV_FILE"]) if values.get("POCKETBOOK_ENV_FILE") else None,
-    )
-
-
-def read_env_file(path: Path) -> dict[str, str]:
-    values: dict[str, str] = {}
-    for raw_line in path.read_text().splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
-            value = value[1:-1]
-        values[key] = value
-    return values
-
-
-def persist_tokens(config: Config) -> Path:
-    env_file = config.env_file or Path(".env").resolve()
-    updates = {
-        "POCKETBOOK_ACCESS_TOKEN": config.access_token,
-        "POCKETBOOK_REFRESH_TOKEN": config.refresh_token,
-    }
-    update_env_file(env_file, updates)
-    return env_file
-
-
-def update_env_file(path: Path, updates: dict[str, str | None]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    lines = path.read_text().splitlines() if path.exists() else []
-    seen: set[str] = set()
-    output: list[str] = []
-    for line in lines:
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in line:
-            output.append(line)
-            continue
-        key, _value = line.split("=", 1)
-        key = key.strip()
-        if key in updates and updates[key]:
-            output.append(f'{key}="{escape_env_value(updates[key] or "")}"')
-            seen.add(key)
-        else:
-            output.append(line)
-    for key, value in updates.items():
-        if key not in seen and value:
-            output.append(f'{key}="{escape_env_value(value)}"')
-    path.write_text("\n".join(output).rstrip() + "\n")
-
-
-def escape_env_value(value: str) -> str:
-    return value.replace("\\", "\\\\").replace('"', '\\"')
-
-
-def read_cookie_file(path: Path) -> str | None:
-    raw = path.expanduser().read_text().strip()
-    if not raw:
-        return None
-    if raw.startswith("{"):
-        parsed = json.loads(raw)
-        cookie = parsed.get("cookie") if isinstance(parsed, dict) else None
-        return cookie.strip() if isinstance(cookie, str) and cookie.strip() else None
-    return re.sub(r"^cookie:\s*", "", raw, flags=re.I).strip()
-
+    def list_books(self, path: str | None = None) -> Response:
+        selected_path = path or DEFAULT_BOOKS_PATH
+        response = self.authenticated(lambda: self.request("GET", selected_path))
+        if is_legacy_files_path(selected_path) and not is_ok(response.status):
+            return self.authenticated(lambda: self.request("GET", DEFAULT_BOOKS_PATH))
+        return response
 
 def auth_result(response: Response, config: Config, persisted: Path | None = None) -> dict[str, Any]:
     body = response.body if isinstance(response.body, dict) else {}
@@ -422,6 +312,112 @@ def delete_summary(response: Response) -> dict[str, Any]:
     }
 
 
+def books_summary(response: Response) -> dict[str, Any]:
+    body = response.body if isinstance(response.body, (dict, list)) else {}
+    books = extract_books(body)
+    return {
+        "ok": is_ok(response.status),
+        "status": response.status,
+        "mode": "books",
+        "count": len(books),
+        "finishedCount": count_finished_books(books),
+        "books": [book_summary(book) for book in books],
+        "error": error_message(body),
+    }
+
+
+def extract_books(body: Any) -> list[dict[str, Any]]:
+    if isinstance(body, list):
+        return [item for item in body if isinstance(item, dict)]
+    if not isinstance(body, dict):
+        return []
+    for key in ("items", "files", "books", "documents", "entries"):
+        value = body.get(key)
+        if isinstance(value, list):
+            return [item for item in value if isinstance(item, dict)]
+    data = body.get("data")
+    if isinstance(data, (dict, list)):
+        return extract_books(data)
+    return []
+
+
+def book_summary(book: dict[str, Any]) -> dict[str, Any]:
+    progress = progress_percent(book)
+    summary = {
+        "title": book_title(book),
+        "author": book_author(book),
+        "progressPercent": progress,
+        "status": book_status(book, progress),
+        "id": str_or_none(book.get("id")),
+        "fastHash": str_or_none(book.get("fast_hash")) or str_or_none(book.get("fastHash")),
+    }
+    return {key: value for key, value in summary.items() if value is not None}
+
+
+def book_status(book: dict[str, Any], progress: int | None = None) -> str:
+    resolved_progress = progress if progress is not None else progress_percent(book)
+    if is_completed_book(book) or (resolved_progress or 0) >= 99:
+        return "finished"
+    if (resolved_progress or 0) > 0:
+        return "in_progress"
+    return "unread"
+
+
+def count_finished_books(books: list[dict[str, Any]]) -> int:
+    return sum(1 for book in books if is_completed_book(book) or (progress_percent(book) or 0) >= 99)
+
+
+def progress_percent(book: dict[str, Any]) -> int | None:
+    for key in ("progressPercent", "progress_percent", "readPercent", "read_percent", "progress", "percent"):
+        value = book.get(key)
+        if isinstance(value, (int, float)):
+            percent = float(value)
+        elif isinstance(value, str) and value.strip():
+            try:
+                percent = float(value.strip().rstrip("%"))
+            except ValueError:
+                continue
+        else:
+            continue
+        if 0 < percent <= 1:
+            percent *= 100
+        return max(0, min(100, round(percent)))
+    return None
+
+
+def is_completed_book(book: dict[str, Any]) -> bool:
+    for key in ("completed", "finished", "is_read", "isRead"):
+        if book.get(key) is True:
+            return True
+    status = str_or_none(book.get("status")) or str_or_none(book.get("read_status")) or str_or_none(book.get("readStatus"))
+    return status.lower() in {"completed", "finished"} if status else False
+
+
+def book_title(book: dict[str, Any]) -> str | None:
+    for key in ("title", "name", "file_name", "filename", "path"):
+        value = str_or_none(book.get(key))
+        if value:
+            return clean_book_title(Path(value).name)
+    return None
+
+
+def clean_book_title(value: str) -> str:
+    for suffix in (".fb2.zip", ".epub", ".fb2", ".pdf", ".txt", ".zip"):
+        if value.lower().endswith(suffix):
+            return value[: -len(suffix)]
+    return value
+
+
+def book_author(book: dict[str, Any]) -> str | None:
+    value = book.get("author") or book.get("authors")
+    if isinstance(value, str):
+        return value.strip() or None
+    if isinstance(value, list):
+        authors = [str(item).strip() for item in value if str(item).strip()]
+        return ", ".join(authors) if authors else None
+    return None
+
+
 def print_json(payload: dict[str, Any]) -> None:
     print(json.dumps(sanitize(payload), indent=2))
 
@@ -464,7 +460,11 @@ def parse_body(raw: bytes, content_type: str) -> Any:
 
 
 def is_recoverable_auth_error(response: Response) -> bool:
-    return response.status == 403 and isinstance(response.body, dict) and response.body.get("error_code") in {222, 223}
+    return response.status == 403
+
+
+def is_legacy_files_path(path: str) -> bool:
+    return path.split("?", 1)[0].rstrip("/") == LEGACY_FILES_PATH.rstrip("/")
 
 
 def is_ok(status: int) -> bool:
@@ -487,18 +487,6 @@ def str_or_none(value: Any) -> str | None:
     if isinstance(value, int):
         return str(value)
     return None
-
-
-def empty_to_none(value: str | None) -> str | None:
-    if value is None:
-        return None
-    stripped = value.strip()
-    return stripped or None
-
-
-def normalize_base_url(value: str) -> str:
-    return value.strip().rstrip("/")
-
 
 def origin(value: str) -> str:
     parsed = urlparse(value)

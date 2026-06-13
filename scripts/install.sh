@@ -47,6 +47,7 @@ fi
 
 cd "$install_dir"
 chmod +x scripts/*.py
+ln -sfn skills/pocketbook-cloud/SKILL.md SKILL.md
 
 echo "Installed $skill_name into $install_dir"
 echo "Restart Codex to pick up the new skill."
