@@ -1,7 +1,7 @@
 {
   "name": "pocketbook-cloud",
   "version": "0.1.0",
-  "description": "Work with PocketBook Cloud from Codex using a bundled deterministic CLI.",
+  "description": "Work with PocketBook Cloud from Codex using bundled Python scripts.",
   "author": {
     "name": "LTDigor",
     "url": "https://github.com/LTDigor"
@@ -18,8 +18,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "PocketBook Cloud",
-    "shortDescription": "List, upload, delete, and inspect PocketBook Cloud books from Codex.",
-    "longDescription": "PocketBook Cloud gives Codex a deterministic CLI-backed workflow for account checks, token refresh, book listing, endpoint probing, uploads, and deletes without browser automation.",
+    "shortDescription": "Authenticate, upload, and delete PocketBook Cloud books from Codex.",
+    "longDescription": "PocketBook Cloud gives Codex Python-script workflows for account checks, token refresh, uploads, and deletes without browser automation.",
     "developerName": "LTDigor",
     "category": "Productivity",
     "capabilities": [
@@ -28,7 +28,7 @@
     ],
     "websiteURL": "https://github.com/LTDigor/pocketbook-cloud-skill",
     "defaultPrompt": [
-      "Use PocketBook Cloud to list my books",
+      "Check my PocketBook Cloud auth",
       "Upload this ebook to PocketBook Cloud",
       "Delete this PocketBook Cloud test book"
     ],

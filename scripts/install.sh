@@ -17,7 +17,7 @@ need() {
 
 need curl
 need tar
-need npm
+need python3
 
 tmp_dir="$(mktemp -d)"
 cleanup() {
@@ -46,12 +46,7 @@ if [ -n "$saved_env" ]; then
 fi
 
 cd "$install_dir"
-if [ -f package-lock.json ]; then
-  npm ci
-else
-  npm install
-fi
-npm run build
+chmod +x scripts/*.py
 
 echo "Installed $skill_name into $install_dir"
 echo "Restart Codex to pick up the new skill."
