@@ -9,6 +9,8 @@ Use this skill when the user asks Codex to work with PocketBook Cloud. Use the b
 
 ## Quick Start
 
+This skill requires the full repository/plugin install, not only this Markdown file. The installed skill directory must contain `scripts/` next to the skill instructions, either as a plugin root or as a standalone install created by `scripts/install.sh`.
+
 Run commands from the repository/plugin root that contains `scripts/`:
 
 ```bash
