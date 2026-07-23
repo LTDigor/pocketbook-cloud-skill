@@ -11,10 +11,11 @@ from urllib.parse import parse_qs, urlparse
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-AUTH_SCRIPT = REPO_ROOT / "scripts" / "pocketbook_auth.py"
-UPLOAD_SCRIPT = REPO_ROOT / "scripts" / "upload_ebook.py"
-DELETE_SCRIPT = REPO_ROOT / "scripts" / "delete_ebook.py"
-GET_BOOKS_SCRIPT = REPO_ROOT / "scripts" / "get_books.py"
+SCRIPT_ROOT = REPO_ROOT.parent / "ObsidianVault" / "scripts" / "projects" / "pocketbook-cloud-skill" / "scripts"
+AUTH_SCRIPT = SCRIPT_ROOT / "pocketbook_auth.py"
+UPLOAD_SCRIPT = SCRIPT_ROOT / "upload_ebook.py"
+DELETE_SCRIPT = SCRIPT_ROOT / "delete_ebook.py"
+GET_BOOKS_SCRIPT = SCRIPT_ROOT / "get_books.py"
 
 
 class PocketBookFakeHandler(BaseHTTPRequestHandler):

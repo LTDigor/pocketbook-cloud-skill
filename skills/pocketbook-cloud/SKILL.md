@@ -9,15 +9,15 @@ Use this skill when the user asks Codex to work with PocketBook Cloud. Use the b
 
 ## Quick Start
 
-This skill requires the full repository/plugin install, not only this Markdown file. The installed skill directory must contain `scripts/` next to the skill instructions, either as a plugin root or as a standalone install created by `scripts/install.sh`.
+This skill requires the full repository/plugin install, not only this Markdown file. The installed skill directory must contain `scripts/` next to the skill instructions, either as a plugin root or as a standalone install created by `../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/install.sh`.
 
-Run commands from the repository/plugin root that contains `scripts/`:
+Run commands from the repository/plugin repository root, with helper scripts stored in the vault:
 
 ```bash
-python3 scripts/pocketbook_auth.py config
-python3 scripts/pocketbook_auth.py login
-python3 scripts/upload_ebook.py "/absolute/path/book.zip"
-python3 scripts/get_books.py
+python3 ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/pocketbook_auth.py config
+python3 ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/pocketbook_auth.py login
+python3 ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/upload_ebook.py "/absolute/path/book.zip"
+python3 ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/get_books.py
 ```
 
 The scripts read credentials from environment variables, `.env`, or `--env-file`.
@@ -53,19 +53,19 @@ Keep login/password, tokens, cookies, and signed URLs only in environment variab
 Log in from credentials and persist tokens:
 
 ```bash
-python3 scripts/pocketbook_auth.py login
+python3 ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/pocketbook_auth.py login
 ```
 
 Refresh and persist tokens:
 
 ```bash
-python3 scripts/pocketbook_auth.py refresh-token
+python3 ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/pocketbook_auth.py refresh-token
 ```
 
 Check current token:
 
 ```bash
-python3 scripts/pocketbook_auth.py user
+python3 ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/pocketbook_auth.py user
 ```
 
 If PocketBook returns `Wrong token format`, `Unknown token`, `error_code: 222`, or `error_code: 223`, the upload/delete scripts try token refresh, then password login when credentials are configured. If both fail, stop and report the error.
@@ -75,7 +75,7 @@ If PocketBook returns `Wrong token format`, `Unknown token`, `error_code: 222`, 
 Prefer the upload script for one local ebook:
 
 ```bash
-python3 scripts/upload_ebook.py "/absolute/path/book.zip"
+python3 ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/upload_ebook.py "/absolute/path/book.zip"
 ```
 
 It validates the file, detects a single `.fb2` entry inside ZIP archives, uploads the original archive as `name.fb2.zip`, and prints a redacted JSON summary. It skips slow post-upload library probes unless the user asks for deeper verification.
@@ -83,7 +83,7 @@ It validates the file, detects a single `.fb2` entry inside ZIP archives, upload
 Use `--remote-name` when needed:
 
 ```bash
-python3 scripts/upload_ebook.py "/absolute/path/book.zip" --remote-name "Book.fb2.zip"
+python3 ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/upload_ebook.py "/absolute/path/book.zip" --remote-name "Book.fb2.zip"
 ```
 
 ## Get Books
@@ -91,7 +91,7 @@ python3 scripts/upload_ebook.py "/absolute/path/book.zip" --remote-name "Book.fb
 List all PocketBook Cloud books as safe redacted JSON:
 
 ```bash
-python3 scripts/get_books.py
+python3 ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/get_books.py
 ```
 
 The script does not call an AI model. It reads the library through the current books API, falls back from the legacy files API when needed, recovers auth inside the Python client, and prints every book with safe fields such as title, progress, status, id, and `fastHash`.
@@ -101,7 +101,7 @@ The script does not call an AI model. It reads the library through the current b
 When the user asks what to read or asks for a PocketBook recommendation, first get the full safe library list:
 
 ```bash
-python3 scripts/get_books.py
+python3 ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/get_books.py
 ```
 
 By default, recommend three new books that are not already uploaded to PocketBook Cloud. If the user asks for a specific number, follow that number. If the user explicitly asks for one book or a single pick, recommend one.
@@ -117,7 +117,7 @@ The recommendations are not produced by the script; the script only supplies saf
 Delete only when the user explicitly asks to remove a book or when cleaning up a temporary integration-test upload:
 
 ```bash
-python3 scripts/delete_ebook.py --fast-hash HASH
+python3 ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/delete_ebook.py --fast-hash HASH
 ```
 
 ## Isolated Env Files
@@ -125,10 +125,10 @@ python3 scripts/delete_ebook.py --fast-hash HASH
 Use `--env-file` for tests or separate credential stores:
 
 ```bash
-python3 scripts/pocketbook_auth.py login --env-file /absolute/path/pocketbook.env
-python3 scripts/upload_ebook.py --env-file /absolute/path/pocketbook.env "/absolute/path/book.fb2"
-python3 scripts/delete_ebook.py --env-file /absolute/path/pocketbook.env --fast-hash HASH
-python3 scripts/get_books.py --env-file /absolute/path/pocketbook.env
+python3 ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/pocketbook_auth.py login --env-file /absolute/path/pocketbook.env
+python3 ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/upload_ebook.py --env-file /absolute/path/pocketbook.env "/absolute/path/book.fb2"
+python3 ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/delete_ebook.py --env-file /absolute/path/pocketbook.env --fast-hash HASH
+python3 ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/get_books.py --env-file /absolute/path/pocketbook.env
 ```
 
 Set `POCKETBOOK_SKIP_LOCAL_ENV=1` when you must prove the command uses only the provided env file.
@@ -137,7 +137,7 @@ Set `POCKETBOOK_SKIP_LOCAL_ENV=1` when you must prove the command uses only the 
 
 ```bash
 python3 -m unittest discover -s tests -p 'test_*.py'
-python3 -m py_compile scripts/pocketbook_config.py scripts/pocketbook_common.py scripts/pocketbook_auth.py scripts/upload_ebook.py scripts/delete_ebook.py scripts/get_books.py
+python3 -m py_compile ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/pocketbook_config.py ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/pocketbook_common.py ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/pocketbook_auth.py ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/upload_ebook.py ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/delete_ebook.py ../ObsidianVault/scripts/projects/pocketbook-cloud-skill/scripts/get_books.py
 ```
 
 `.fb2.zip` files can be uploaded as-is; do not unzip them unless the task requires inspecting the book contents.
